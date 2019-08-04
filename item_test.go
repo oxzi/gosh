@@ -68,22 +68,22 @@ func TestOwnerType(t *testing.T) {
 }
 
 func TestItem(t *testing.T) {
-	const (
-		maxFilesize = 1024
-		formName    = "file"
-	)
+	const maxFilesize = 1024
 
 	tests := []struct {
-		size     int64
-		filename string
+		size             int64
+		filename         string
+		burnAfterReading bool
 
 		valid bool
 	}{
-		{0, "", false},
-		{1, "test.jpg", true},
-		{1024, "test.jpg", true},
-		{1024, "", false},
-		{1025, "", false},
+		{0, "", false, false},
+		{1, "test.jpg", false, true},
+		{1, "test.jpg", true, true},
+		{1024, "test.jpg", false, true},
+		{1024, "test.jpg", true, true},
+		{1024, "", false, false},
+		{1025, "", false, false},
 	}
 
 	for _, test := range tests {
@@ -94,11 +94,19 @@ func TestItem(t *testing.T) {
 		rand.Seed(0)
 		rand.Read(tmpFileData)
 
-		if f, err := writer.CreateFormFile("file", test.filename); err != nil {
+		if f, err := writer.CreateFormFile(formFile, test.filename); err != nil {
 			t.Fatal(err)
 		} else {
 			tmpFileBuff := bytes.NewBuffer(tmpFileData)
 			if _, err := io.Copy(f, tmpFileBuff); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if test.burnAfterReading {
+			if w, err := writer.CreateFormField(formBurnAfterReading); err != nil {
+				t.Fatal(err)
+			} else if _, err := w.Write([]byte("1")); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -113,7 +121,7 @@ func TestItem(t *testing.T) {
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.RemoteAddr = "[fe80::42]:2342"
 
-			i, f, err := NewItem(r, maxFilesize, formName)
+			i, f, err := NewItem(r, maxFilesize)
 			if (err == nil) != test.valid {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
@@ -126,10 +134,16 @@ func TestItem(t *testing.T) {
 				t.Fatalf("Item Filename mismatches, got %v and expected %v", i.Filename, test.filename)
 			}
 
+			if i.BurnAfterReading != test.burnAfterReading {
+				t.Fatalf("Burn After Reading mismatches, got %t and expected %t",
+					i.BurnAfterReading, test.burnAfterReading)
+			}
+
 			if data, err := ioutil.ReadAll(f); err != nil {
 				t.Fatal(err)
 			} else if !reflect.DeepEqual(tmpFileData, data) {
-				t.Fatalf("Data mismatches; got something of length %d and expected %d", len(data), len(tmpFileData))
+				t.Fatalf("Data mismatches; got something of length %d and expected %d",
+					len(data), len(tmpFileData))
 			}
 
 			if err := f.Close(); err != nil {

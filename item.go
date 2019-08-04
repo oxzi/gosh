@@ -6,6 +6,12 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"time"
+)
+
+const (
+	formFile             string = "file"
+	formBurnAfterReading string = "burn"
 )
 
 // OwnerType describes a possible type of an owner, as an IP address. This can
@@ -51,31 +57,32 @@ func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 	return
 }
 
-// Item describes an uploaded File.
+// Item describes an uploaded file.
 type Item struct {
 	ID string
+
+	BurnAfterReading bool
 
 	Filename    string
 	ContentType string
 
-	/* // TODO
-	BurnAfterReading bool
-	Expires          time.Time
-	*/
+	Created time.Time
+	Expires time.Time
 
 	Owner map[OwnerType]net.IP
 }
 
-// NewItem creates a new Item based on a Request. The ID of the Item is not set
-// yet. Furthermore, if no error has occurred, a file is returned from which
-// the file content should be read. This file must be closed afterwards.
-func NewItem(r *http.Request, maxSize int64, formName string) (item Item, file io.ReadCloser, err error) {
+// NewItem creates a new Item based on a Request. Neither the ID nor the
+// expiration date (Expires) are set yet. Furthermore, if no error has
+// occurred, a file is returned from which the file content should be read.
+// This file must be closed afterwards.
+func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err error) {
 	err = r.ParseMultipartForm(maxSize)
 	if err != nil {
 		return
 	}
 
-	file, fileHeader, err := r.FormFile(formName)
+	file, fileHeader, err := r.FormFile(formFile)
 	if err != nil {
 		return
 	}
@@ -95,6 +102,10 @@ func NewItem(r *http.Request, maxSize int64, formName string) (item Item, file i
 		return
 	}
 
+	if burnAfterReading := r.FormValue(formBurnAfterReading); burnAfterReading == "1" {
+		item.BurnAfterReading = true
+	}
+
 	item.Filename = filepath.Base(filepath.Clean(fileHeader.Filename))
 
 	if contentType := fileHeader.Header.Get("Content-Type"); contentType == "" {
@@ -103,6 +114,8 @@ func NewItem(r *http.Request, maxSize int64, formName string) (item Item, file i
 	} else {
 		item.ContentType = contentType
 	}
+
+	item.Created = time.Now()
 
 	if item.Owner, err = NewOwnerTypes(r); err != nil {
 		return
