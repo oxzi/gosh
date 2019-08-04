@@ -59,7 +59,7 @@ func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 
 // Item describes an uploaded file.
 type Item struct {
-	ID string
+	ID string `badgerhold:"key"`
 
 	BurnAfterReading bool
 
@@ -67,7 +67,7 @@ type Item struct {
 	ContentType string
 
 	Created time.Time
-	Expires time.Time
+	Expires time.Time `badgerholdIndex:"Expires"`
 
 	Owner map[OwnerType]net.IP
 }
@@ -115,7 +115,7 @@ func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err
 		item.ContentType = contentType
 	}
 
-	item.Created = time.Now()
+	item.Created = time.Now().UTC()
 
 	if item.Owner, err = NewOwnerTypes(r); err != nil {
 		return
