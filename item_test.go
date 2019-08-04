@@ -1,6 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"io/ioutil"
+	"math/rand"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"reflect"
@@ -58,6 +63,78 @@ func TestOwnerType(t *testing.T) {
 
 		if !reflect.DeepEqual(ots, test.ots) {
 			t.Fatalf("OwnerTypes are not equal, got %v and expected %v", ots, test.ots)
+		}
+	}
+}
+
+func TestItem(t *testing.T) {
+	const (
+		maxFilesize = 1024
+		formName    = "file"
+	)
+
+	tests := []struct {
+		size     int64
+		filename string
+
+		valid bool
+	}{
+		{0, "", false},
+		{1, "test.jpg", true},
+		{1024, "test.jpg", true},
+		{1024, "", false},
+		{1025, "", false},
+	}
+
+	for _, test := range tests {
+		buff := &bytes.Buffer{}
+		writer := multipart.NewWriter(buff)
+
+		tmpFileData := make([]byte, test.size)
+		rand.Seed(0)
+		rand.Read(tmpFileData)
+
+		if f, err := writer.CreateFormFile("file", test.filename); err != nil {
+			t.Fatal(err)
+		} else {
+			tmpFileBuff := bytes.NewBuffer(tmpFileData)
+			if _, err := io.Copy(f, tmpFileBuff); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		if r, err := http.NewRequest("POST", "http://foo.bar/", buff); err != nil {
+			t.Fatal(err)
+		} else {
+			r.Header.Set("Content-Type", writer.FormDataContentType())
+			r.RemoteAddr = "[fe80::42]:2342"
+
+			i, f, err := NewItem(r, maxFilesize, formName)
+			if (err == nil) != test.valid {
+				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
+			}
+
+			if !test.valid {
+				continue
+			}
+
+			if i.Filename != test.filename {
+				t.Fatalf("Item Filename mismatches, got %v and expected %v", i.Filename, test.filename)
+			}
+
+			if data, err := ioutil.ReadAll(f); err != nil {
+				t.Fatal(err)
+			} else if !reflect.DeepEqual(tmpFileData, data) {
+				t.Fatalf("Data mismatches; got something of length %d and expected %d", len(data), len(tmpFileData))
+			}
+
+			if err := f.Close(); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 }
