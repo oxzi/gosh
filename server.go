@@ -13,9 +13,7 @@ type Server struct {
 }
 
 const (
-	dirDb    = "store/db"
-	dirFiles = "store/files"
-
+	storage = "store"
 	maxSize = 10 * 1024 * 1024
 )
 
@@ -35,7 +33,7 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleRootPost(w http.ResponseWriter, r *http.Request) {
-	item, _, err := NewItem(r, maxSize)
+	item, f, err := NewItem(r, maxSize)
 	if err != nil {
 		log.WithError(err).Warn("Failed to create new Item")
 
@@ -47,7 +45,7 @@ func (serv *Server) handleRootPost(w http.ResponseWriter, r *http.Request) {
 	item.ID = fmt.Sprintf("%d", time.Now().UTC().Unix())
 	item.Expires = time.Now().Add(10 * time.Second).UTC()
 
-	if err := serv.store.Put(item); err != nil {
+	if err := serv.store.Put(item, f); err != nil {
 		log.WithError(err).Warn("Failed to store Item")
 
 		http.Error(w, "", http.StatusBadRequest)
@@ -88,7 +86,7 @@ func (serv *Server) handleFileReq(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	store, err := NewStore(dirDb, dirFiles)
+	store, err := NewStore(storage)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}

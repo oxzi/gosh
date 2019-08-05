@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -10,11 +12,18 @@ import (
 	"github.com/timshannon/badgerhold"
 )
 
+const (
+	dirDatabase = "db"
+	dirStorage  = "data"
+)
+
+// ErrNotFound is returned by the `Store.Get` method if there is no Item for
+// the requested ID.
 var ErrNotFound = errors.New("No Item found for this ID")
 
+// Store stores an index of all Items as well as the pure files.
 type Store struct {
-	dbDir   string
-	fileDir string
+	baseDir string
 
 	bh *badgerhold.Store
 
@@ -22,16 +31,18 @@ type Store struct {
 	stopAck chan struct{}
 }
 
-func NewStore(dbDir, fileDir string) (s *Store, err error) {
+// NewStore opens or initializes a Store in the given directory.
+func NewStore(baseDir string) (s *Store, err error) {
 	s = &Store{
-		dbDir:   dbDir,
-		fileDir: fileDir,
+		baseDir: baseDir,
 
 		stopSyn: make(chan struct{}),
 		stopAck: make(chan struct{}),
 	}
 
-	for _, dir := range []string{dbDir, fileDir} {
+	log.WithField("directory", baseDir).Info("Opening Store")
+
+	for _, dir := range []string{baseDir, s.databaseDir(), s.storageDir()} {
 		if _, stat := os.Stat(dir); os.IsNotExist(stat) {
 			if err = os.Mkdir(dir, 0700); err != nil {
 				return
@@ -40,8 +51,9 @@ func NewStore(dbDir, fileDir string) (s *Store, err error) {
 	}
 
 	opts := badgerhold.DefaultOptions
-	opts.Dir = dbDir
-	opts.ValueDir = dbDir
+	opts.Dir = s.databaseDir()
+	opts.ValueDir = opts.Dir
+	opts.Logger = log.StandardLogger()
 
 	if s.bh, err = badgerhold.Open(opts); err != nil {
 		return
@@ -52,6 +64,17 @@ func NewStore(dbDir, fileDir string) (s *Store, err error) {
 	return
 }
 
+// databaseDir returns the database subdirectory.
+func (s Store) databaseDir() string {
+	return filepath.Join(s.baseDir, dirDatabase)
+}
+
+// storageDir returns the file storage subdirectory.
+func (s Store) storageDir() string {
+	return filepath.Join(s.baseDir, dirStorage)
+}
+
+// cleanupExired runs in a background goroutine to clean up expired Items.
 func (s *Store) cleanupExired() {
 	var ticker = time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -63,39 +86,69 @@ func (s *Store) cleanupExired() {
 			return
 
 		case <-ticker.C:
-			s.DeleteExpired()
+			if err := s.DeleteExpired(); err != nil {
+				log.WithError(err).Warn("Deletion of expired Items errored")
+			}
 		}
 	}
 }
 
+// Close the Store and its database.
 func (s *Store) Close() error {
+	log.Info("Closing Store")
+
 	close(s.stopSyn)
 	<-s.stopAck
 
 	return s.bh.Close()
 }
 
+// Get an Item by its ID. The Item's file can be accessed with `Item.ReadFile`.
 func (s *Store) Get(id string) (i Item, err error) {
+	log.WithField("ID", id).Debug("Requested Item from Store")
+
 	err = s.bh.Get(id, &i)
 	if err == badgerhold.ErrNotFound {
+		log.WithField("ID", id).Debug("Requested Item was not found")
 		err = ErrNotFound
+	} else if err != nil {
+		log.WithField("ID", id).WithError(err).Warn("Requested Item errored")
 	} else if err == nil && i.Expires.Before(time.Now()) {
-		// TODO: handle deletion error
-		s.Delete(i)
+		log.WithFields(log.Fields{
+			"ID":      id,
+			"Expires": i.Expires,
+		}).Debug("Requested Item is expired, will be deleted")
+
+		if err := s.Delete(i); err != nil {
+			log.WithError(err).WithField("ID", id).Warn("Deletion of expired Item errored")
+		}
+
 		err = ErrNotFound
 	}
-	// TODO: burn after reading
 
 	return
 }
 
-func (s *Store) Put(i Item) error {
-	log.Info(s)
+// Put a new Item inside the Store. Both a database entry and a file will be created.
+func (s *Store) Put(i Item, file io.ReadCloser) (err error) {
+	log.WithField("ID", i.ID).Debug("Requested insertion of Item into the Store")
 
-	// TODO create file
-	return s.bh.Insert(i.ID, i)
+	err = s.bh.Insert(i.ID, i)
+	if err != nil {
+		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into database errored")
+		return
+	}
+
+	err = i.WriteFile(file, s.storageDir())
+	if err != nil {
+		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
+		return
+	}
+
+	return
 }
 
+// DeleteExpired checks the Store for expired Items and deletes them.
 func (s *Store) DeleteExpired() error {
 	var items []Item
 	if err := s.bh.Find(&items, badgerhold.Where("Expires").Lt(time.Now())); err != nil {
@@ -103,6 +156,7 @@ func (s *Store) DeleteExpired() error {
 	}
 
 	for _, i := range items {
+		log.WithField("ID", i.ID).Debug("Delete expired Item")
 		if err := s.Delete(i); err != nil {
 			return err
 		}
@@ -111,7 +165,21 @@ func (s *Store) DeleteExpired() error {
 	return nil
 }
 
-func (s *Store) Delete(i Item) error {
-	// TODO delete file
-	return s.bh.Delete(i.ID, i)
+// Delte an Item. Both the database entry and the file will be removed.
+func (s *Store) Delete(i Item) (err error) {
+	log.WithField("ID", i.ID).Debug("Requested deletion of Item")
+
+	err = s.bh.Delete(i.ID, i)
+	if err != nil {
+		log.WithField("ID", i.ID).WithError(err).Warn("Deletion of Item from database errored")
+		return
+	}
+
+	err = i.DeleteFile(s.storageDir())
+	if err != nil {
+		log.WithField("ID", i.ID).WithError(err).Warn("Deletion of Item from storage errored")
+		return
+	}
+
+	return
 }

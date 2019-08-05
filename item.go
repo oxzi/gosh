@@ -125,12 +125,15 @@ func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err
 	return
 }
 
+// targetFile returns the path to the Item's file.
+func (i Item) targetFile(directory string) string {
+	return filepath.Join(directory, i.ID)
+}
+
 // WriteFile serializes the file of an Item in the given directory. The file
 // name will be the ID of the Item.
 func (i Item) WriteFile(file io.ReadCloser, directory string) error {
-	target := filepath.Join(directory, i.ID)
-
-	f, err := os.Create(target)
+	f, err := os.Create(i.targetFile(directory))
 	if err != nil {
 		return err
 	}
@@ -145,9 +148,11 @@ func (i Item) WriteFile(file io.ReadCloser, directory string) error {
 }
 
 // ReadFile deserializes the file of an Item from the given directory into a Reader.
-func (i Item) ReadFile(directory string) (file io.Reader, err error) {
-	target := filepath.Join(directory, i.ID)
-	file, err = os.Open(target)
+func (i Item) ReadFile(directory string) (io.Reader, error) {
+	return os.Open(i.targetFile(directory))
+}
 
-	return
+// DeleteFile removes the file of an Item from the given directory.
+func (i Item) DeleteFile(directory string) error {
+	return os.Remove(i.targetFile(directory))
 }

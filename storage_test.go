@@ -1,32 +1,49 @@
 package main
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
+// dummyReadCloser wraps around a bytes.Buffer and implements a ReadCloser.
+type dummyReadCloser struct {
+	buff *bytes.Buffer
+}
+
+func newDummyReadCloser(b *bytes.Buffer) dummyReadCloser {
+	return dummyReadCloser{buff: b}
+}
+
+func (drc dummyReadCloser) Read(p []byte) (int, error) {
+	return drc.buff.Read(p)
+}
+
+func (drc dummyReadCloser) Close() error {
+	return nil
+}
+
 func TestStore(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+
 	item := Item{
 		ID:      "foobar",
 		Expires: time.Now().Add(time.Minute).UTC(),
 	}
+	itemData := newDummyReadCloser(bytes.NewBuffer([]byte("hello world")))
 
-	storeDb, err := ioutil.TempDir("", "db")
+	storageDir, err := ioutil.TempDir("", "db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	storeFiles, err := ioutil.TempDir("", "files")
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer os.RemoveAll(storageDir)
 
-	defer os.RemoveAll(storeDb)
-	defer os.RemoveAll(storeFiles)
-
-	store, err := NewStore(storeDb, storeFiles)
+	store, err := NewStore(storageDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +52,7 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.Put(item); err != nil {
+	if err := store.Put(item, itemData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,7 +69,7 @@ func TestStore(t *testing.T) {
 	}
 
 	item.Expires = time.Now().Add(-1 * time.Minute).UTC()
-	if err := store.Put(item); err != nil {
+	if err := store.Put(item, itemData); err != nil {
 		t.Fatal(err)
 	}
 
