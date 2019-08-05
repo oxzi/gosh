@@ -40,7 +40,7 @@ func init() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if lt, err := time.ParseDuration(maxLifetimeStr); err != nil {
+	if lt, err := gosh.ParseDuration(maxLifetimeStr); err != nil {
 		log.WithError(err).Fatal("Failed to parse lifetime")
 	} else {
 		maxLifetime = lt

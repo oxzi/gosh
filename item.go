@@ -125,7 +125,7 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 
 	if lifetime := r.FormValue(formLifetime); lifetime == "" {
 		item.Expires = item.Created.Add(maxLifetime)
-	} else if parseLt, parseLtErr := time.ParseDuration(lifetime); parseLtErr != nil {
+	} else if parseLt, parseLtErr := ParseDuration(lifetime); parseLtErr != nil {
 		err = parseLtErr
 		return
 	} else if parseLt > maxLifetime {
