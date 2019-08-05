@@ -142,7 +142,7 @@ func (s *Store) Get(id string) (i Item, err error) {
 		log.WithFields(log.Fields{
 			"ID":      id,
 			"Expires": i.Expires,
-		}).Debug("Requested Item is expired, will be deleted")
+		}).Info("Requested Item is expired, will be deleted")
 
 		if err := s.Delete(i); err != nil {
 			log.WithError(err).WithField("ID", id).Warn("Deletion of expired Item errored")

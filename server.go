@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -35,12 +36,8 @@ func (serv *Server) Close() error {
 func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if reqPath := r.URL.Path; reqPath == "/" {
 		serv.handleRoot(w, r)
-	} else if reqPath[:3] == "/r/" {
-		serv.handleRequest(w, r)
 	} else {
-		log.WithField("path", reqPath).Debug("Request to an unsupported path")
-
-		http.Error(w, "Does not exists.", http.StatusNotFound)
+		serv.handleRequest(w, r)
 	}
 }
 
@@ -60,7 +57,6 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	// TODO
 	http.Error(w, "not supported yet", http.StatusTeapot)
 }
 
@@ -83,10 +79,13 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithField("ID", itemId).Info("Uploaded new Item")
+	log.WithFields(log.Fields{
+		"ID":       itemId,
+		"filename": item.Filename,
+	}).Info("Uploaded new Item")
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%s\n", itemId)
+	fmt.Fprintf(w, "http://%s/%s\n", r.Host, itemId)
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +96,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqId := r.URL.RequestURI()[3:]
+	reqId := strings.TrimLeft(r.URL.Path, "/")
 
 	item, err := serv.store.Get(reqId)
 	if err == ErrNotFound {
@@ -124,11 +123,22 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		if _, err := io.Copy(w, f); err != nil {
+			// This might happen if the peer resets the connection, e.g., if
+			// curl tries to print a non text file to stdout.
 			log.WithError(err).WithField("ID", item.ID).Warn("Writing file errored")
-			return
 		}
 
-		log.WithField("ID", item.ID).Debug("Item was requested")
+		log.WithFields(log.Fields{
+			"ID":       item.ID,
+			"filename": item.Filename,
+		}).Info("Item was requested")
+	}
+
+	if item.BurnAfterReading {
+		log.WithField("ID", item.ID).Info("Item will be burned")
+		if err := serv.store.Delete(item); err != nil {
+			log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
+		}
 	}
 }
 
