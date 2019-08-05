@@ -128,7 +128,7 @@ func (s *Store) Close() error {
 	return s.bh.Close()
 }
 
-// Get an Item by its ID. The Item's file can be accessed with `Item.ReadFile`.
+// Get an Item by its ID. The Item's file can be accessed with GetFile.
 func (s *Store) Get(id string) (i Item, err error) {
 	log.WithField("ID", id).Debug("Requested Item from Store")
 
@@ -152,6 +152,11 @@ func (s *Store) Get(id string) (i Item, err error) {
 	}
 
 	return
+}
+
+// GetFile creates a Reader to the Item's file.
+func (s *Store) GetFile(i Item) (io.Reader, error) {
+	return i.ReadFile(s.storageDir())
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.

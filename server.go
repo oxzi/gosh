@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -9,92 +10,137 @@ import (
 )
 
 type Server struct {
-	store *Store
+	store   *Store
+	maxSize int64
 }
 
-const (
-	storage = "store"
-	maxSize = 10 * 1024 * 1024
-)
+func NewServer(storeDirectory string, maxSize int64) (s *Server, err error) {
+	store, storeErr := NewStore(storeDirectory)
+	if storeErr != nil {
+		err = storeErr
+		return
+	}
+
+	s = &Server{
+		store:   store,
+		maxSize: maxSize,
+	}
+	return
+}
+
+func (serv *Server) Close() error {
+	return serv.store.Close()
+}
+
+func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if reqPath := r.URL.Path; reqPath == "/" {
+		serv.handleRoot(w, r)
+	} else if reqPath[:3] == "/r/" {
+		serv.handleRequest(w, r)
+	} else {
+		log.WithField("path", reqPath).Debug("Request to an unsupported path")
+
+		http.Error(w, "Does not exists.", http.StatusNotFound)
+	}
+}
 
 func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		serv.handleRootGet(w, r)
+		serv.handleIndex(w, r)
 
 	case "POST":
-		serv.handleRootPost(w, r)
+		serv.handleUpload(w, r)
 
 	default:
-		log.WithField("method", r.Method).Info("Called with unsupported method")
+		log.WithField("method", r.Method).Debug("Called with unsupported method")
 
-		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		http.Error(w, "Method not supported.", http.StatusMethodNotAllowed)
 	}
 }
 
-func (serv *Server) handleRootPost(w http.ResponseWriter, r *http.Request) {
-	item, f, err := NewItem(r, maxSize)
+func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	// TODO
+	http.Error(w, "not supported yet", http.StatusTeapot)
+}
+
+func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	item, f, err := NewItem(r, serv.maxSize)
 	if err != nil {
 		log.WithError(err).Warn("Failed to create new Item")
 
-		http.Error(w, "", http.StatusBadRequest)
+		http.Error(w, "Something went wrong.", http.StatusBadRequest)
 		return
 	}
 
-	item.Expires = time.Now().Add(10 * time.Second).UTC()
+	item.Expires = time.Now().Add(30 * time.Second).UTC()
 
 	itemId, err := serv.store.Put(item, f)
 	if err != nil {
 		log.WithError(err).Warn("Failed to store Item")
 
-		http.Error(w, "", http.StatusBadRequest)
+		http.Error(w, "Something went wrong.", http.StatusBadRequest)
 		return
 	}
 
+	log.WithField("ID", itemId).Info("Uploaded new Item")
+
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%s", itemId)
+	fmt.Fprintf(w, "%s\n", itemId)
 }
 
-func (serv *Server) handleRootGet(w http.ResponseWriter, r *http.Request) {
-	// TODO
-	http.Error(w, "not supported yet", http.StatusTeapot)
-}
+func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		log.WithField("method", r.Method).Debug("Request got wrong method")
 
-func (serv *Server) handleFileReq(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
 	reqId := r.URL.RequestURI()[3:]
 
 	item, err := serv.store.Get(reqId)
 	if err == ErrNotFound {
-		log.WithField("ID", reqId).Info("Requested non-existing ID")
+		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Error(w, "Does not exists.", http.StatusNotFound)
 		return
 	} else if err != nil {
 		log.WithError(err).WithField("ID", reqId).Warn("Requesting errored")
 
-		http.Error(w, "", http.StatusBadRequest)
+		http.Error(w, "Something went wrong.", http.StatusBadRequest)
 		return
 	}
 
-	log.Info(item)
+	if f, err := serv.store.GetFile(item); err != nil {
+		log.WithError(err).WithField("ID", item.ID).Warn("Reading file errored")
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "okäse: %s", item.ID)
+		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		return
+	} else {
+		w.Header().Set("Content-Type", item.ContentType)
+		w.Header().Set("Content-Disposition",
+			fmt.Sprintf("attachment; filename=\"%s\"", item.Filename))
+		w.WriteHeader(http.StatusOK)
+
+		if _, err := io.Copy(w, f); err != nil {
+			log.WithError(err).WithField("ID", item.ID).Warn("Writing file errored")
+			return
+		}
+
+		log.WithField("ID", item.ID).Debug("Item was requested")
+	}
 }
 
 func main() {
-	store, err := NewStore(storage)
+	server, err := NewServer("store", 10*1024*1024)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
 
-	serv := &Server{store: store}
+	http.ListenAndServe(":8080", server)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", serv.handleRoot)
-	mux.HandleFunc("/r/", serv.handleFileReq)
-
-	http.ListenAndServe(":8080", mux)
-
-	store.Close()
+	if err := server.Close(); err != nil {
+		log.WithError(err).Fatal("Closing errored")
+	}
 }
