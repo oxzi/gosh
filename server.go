@@ -56,6 +56,7 @@ please write an e-mail to {{.EMail}}.
 Please allow me a certain amount of time to react and work on your request.
 `
 
+// Server implements an http.Handler for up- and download.
 type Server struct {
 	store       *Store
 	maxSize     int64
@@ -63,6 +64,8 @@ type Server struct {
 	contactMail string
 }
 
+// NewServer creates a new Server with a given database directory, and
+// configuration values. The Server must be started as an http.Handler.
 func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, contactMail string) (s *Server, err error) {
 	store, storeErr := NewStore(storeDirectory)
 	if storeErr != nil {
@@ -79,6 +82,7 @@ func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, 
 	return
 }
 
+// Close the Server and its components.
 func (serv *Server) Close() error {
 	return serv.store.Close()
 }
@@ -218,18 +222,5 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		if err := serv.store.Delete(item); err != nil {
 			log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
 		}
-	}
-}
-
-func main() {
-	server, err := NewServer("store", 10*1024*1024, 10*time.Minute, "foo@bar.buz")
-	if err != nil {
-		log.WithError(err).Fatal("Failed to start Store")
-	}
-
-	http.ListenAndServe(":8080", server)
-
-	if err := server.Close(); err != nil {
-		log.WithError(err).Fatal("Closing errored")
 	}
 }
