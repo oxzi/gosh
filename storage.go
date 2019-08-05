@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"errors"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/akamensky/base58"
 	"github.com/timshannon/badgerhold"
 )
 
@@ -93,6 +95,29 @@ func (s *Store) cleanupExired() {
 	}
 }
 
+// createID creates a random ID for a new Item.
+func (s *Store) createID() (id string, err error) {
+	// 4 Bytes of randomnes -> 4*8 = 32 Bits of randomness
+	// 2^32 = 4 294 967 296 possible combinations
+	idBuff := make([]byte, 4)
+
+	for {
+		_, err = rand.Read(idBuff)
+		if err != nil {
+			return
+		}
+
+		id = string(base58.Encode(idBuff))
+
+		if bhErr := s.bh.Get(id, Item{}); bhErr == badgerhold.ErrNotFound {
+			return
+		} else if bhErr != nil {
+			err = bhErr
+			return
+		}
+	}
+}
+
 // Close the Store and its database.
 func (s *Store) Close() error {
 	log.Info("Closing Store")
@@ -130,8 +155,17 @@ func (s *Store) Get(id string) (i Item, err error) {
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.
-func (s *Store) Put(i Item, file io.ReadCloser) (err error) {
-	log.WithField("ID", i.ID).Debug("Requested insertion of Item into the Store")
+func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
+	log.Debug("Requested insertion of Item into the Store")
+
+	id, err = s.createID()
+	if err != nil {
+		log.WithError(err).Warn("Creation of an ID for a new Item errored")
+		return
+	}
+
+	i.ID = id
+	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
 
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {

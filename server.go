@@ -41,21 +41,18 @@ func (serv *Server) handleRootPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: original/better ID
-	item.ID = fmt.Sprintf("%d", time.Now().UTC().Unix())
 	item.Expires = time.Now().Add(10 * time.Second).UTC()
 
-	if err := serv.store.Put(item, f); err != nil {
+	itemId, err := serv.store.Put(item, f)
+	if err != nil {
 		log.WithError(err).Warn("Failed to store Item")
 
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 
-	// TODO: write file to disk
-
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%s", item.ID)
+	fmt.Fprintf(w, "%s", itemId)
 }
 
 func (serv *Server) handleRootGet(w http.ResponseWriter, r *http.Request) {

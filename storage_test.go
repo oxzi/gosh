@@ -31,10 +31,7 @@ func (drc dummyReadCloser) Close() error {
 func TestStore(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
-	item := Item{
-		ID:      "foobar",
-		Expires: time.Now().Add(time.Minute).UTC(),
-	}
+	item := Item{Expires: time.Now().Add(time.Minute).UTC()}
 	itemData := newDummyReadCloser(bytes.NewBuffer([]byte("hello world")))
 
 	storageDir, err := ioutil.TempDir("", "db")
@@ -52,11 +49,13 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.Put(item, itemData); err != nil {
+	itemId, err := store.Put(item, itemData)
+	if err != nil {
 		t.Fatal(err)
 	}
+	item.ID = itemId
 
-	if itemX, err := store.Get(item.ID); err != nil {
+	if itemX, err := store.Get(itemId); err != nil {
 		t.Fatal(err)
 	} else if !reflect.DeepEqual(item, itemX) {
 		t.Fatalf("Fetched Item mismatches: got %v and expected %v", itemX, item)
@@ -69,7 +68,7 @@ func TestStore(t *testing.T) {
 	}
 
 	item.Expires = time.Now().Add(-1 * time.Minute).UTC()
-	if err := store.Put(item, itemData); err != nil {
+	if _, err := store.Put(item, itemData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,6 +76,39 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	} else if _, err := store.Get(item.ID); err != ErrNotFound {
 		t.Fatal(err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStoreCreateId(t *testing.T) {
+	const ids = 1024
+
+	storageDir, err := ioutil.TempDir("", "db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(storageDir)
+
+	store, err := NewStore(storageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idCheck := make(map[string]struct{})
+	for i := 0; i < ids; i++ {
+		id, err := store.createID()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, exists := idCheck[id]; exists {
+			t.Fatalf("ID %s does already exists", id)
+		} else {
+			idCheck[id] = struct{}{}
+		}
 	}
 
 	if err := store.Close(); err != nil {
