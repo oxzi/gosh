@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"strings"
@@ -10,13 +11,59 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const indexTpl = `# gosh, Go Share
+
+Upload your files to this server and share them with your friends or, if
+non-existent, shady people from the Internet. Your file will expire after
+{{.Expires}} or earlier, if explicitly specified. Optionally, the file can be
+deleted directly after the first retrieval. In addition, the maximum
+file size is {{.Size}}.
+
+This is no place to share questionable or illegal data. Please use another
+service or stop it completely. Get some help.
+
+The gosh software can be obtained from <https://github.com/geistesk/gosh>.
+
+
+## Posting
+
+POST your files over HTTP:
+$ curl -F 'file=@foo.png' http://{{.Hostname}}/
+
+Burn after reading:
+$ curl -F 'file=@foo.png' -F 'burn=1' http://{{.Hostname}}/
+
+Set a custom expiry date, e.g., one minute:
+$ curl -F 'file=@foo.png' -F 'time=1m' http://{{.Hostname}}/
+
+Or all together:
+$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' http://{{.Hostname}}/
+
+
+## Privacy
+
+This software stores the IP address for each upload. This information is
+stored as long as the file is available. In addition, the IP address of the
+user might be loged in case of an error. A normal download is logged without
+user information.
+
+
+## Abuse
+
+If, for whatever reason, you would like to have a file removed prematurely,
+please write an e-mail to {{.EMail}}.
+
+Please allow me a certain amount of time to react and work on your request.
+`
+
 type Server struct {
 	store       *Store
 	maxSize     int64
 	maxLifetime time.Duration
+	contactMail string
 }
 
-func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration) (s *Server, err error) {
+func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, contactMail string) (s *Server, err error) {
 	store, storeErr := NewStore(storeDirectory)
 	if storeErr != nil {
 		err = storeErr
@@ -27,6 +74,7 @@ func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration) 
 		store:       store,
 		maxSize:     maxSize,
 		maxLifetime: maxLifetime,
+		contactMail: contactMail,
 	}
 	return
 }
@@ -59,7 +107,32 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not supported yet", http.StatusTeapot)
+	t, err := template.New("index").Parse(indexTpl)
+	if err != nil {
+		log.WithError(err).Warn("Failed to parse template")
+
+		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		return
+	}
+
+	data := struct {
+		Expires  string
+		Size     string
+		Hostname string
+		EMail    string
+	}{
+		Expires:  serv.maxLifetime.String(),
+		Size:     fmt.Sprintf("%d Bytes", serv.maxSize),
+		Hostname: r.Host,
+		EMail:    serv.contactMail,
+	}
+
+	w.Header().Set("Content-Type", "text/plain;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+
+	if err := t.Execute(w, data); err != nil {
+		log.WithError(err).Warn("Failed to execute template")
+	}
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +222,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	server, err := NewServer("store", 10*1024*1024, 10*time.Minute)
+	server, err := NewServer("store", 10*1024*1024, 10*time.Minute, "foo@bar.buz")
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
