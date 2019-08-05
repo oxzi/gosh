@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -120,6 +121,33 @@ func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err
 	if item.Owner, err = NewOwnerTypes(r); err != nil {
 		return
 	}
+
+	return
+}
+
+// WriteFile serializes the file of an Item in the given directory. The file
+// name will be the ID of the Item.
+func (i Item) WriteFile(file io.ReadCloser, directory string) error {
+	target := filepath.Join(directory, i.ID)
+
+	f, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	if _, err := io.Copy(f, file); err != nil {
+		return err
+	}
+
+	return file.Close()
+}
+
+// ReadFile deserializes the file of an Item from the given directory into a Reader.
+func (i Item) ReadFile(directory string) (file io.Reader, err error) {
+	target := filepath.Join(directory, i.ID)
+	file, err = os.Open(target)
 
 	return
 }

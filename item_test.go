@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -126,6 +127,8 @@ func TestItem(t *testing.T) {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
 
+			i.ID = "test-id-23"
+
 			if !test.valid {
 				continue
 			}
@@ -139,11 +142,23 @@ func TestItem(t *testing.T) {
 					i.BurnAfterReading, test.burnAfterReading)
 			}
 
-			if data, err := ioutil.ReadAll(f); err != nil {
+			if itemDir, err := ioutil.TempDir("", ""); err != nil {
 				t.Fatal(err)
-			} else if !reflect.DeepEqual(tmpFileData, data) {
-				t.Fatalf("Data mismatches; got something of length %d and expected %d",
-					len(data), len(tmpFileData))
+			} else {
+				if err := i.WriteFile(f, itemDir); err != nil {
+					t.Fatal(err)
+				}
+
+				if file, err := i.ReadFile(itemDir); err != nil {
+					t.Fatal(err)
+				} else if data, err := ioutil.ReadAll(file); err != nil {
+					t.Fatal(err)
+				} else if !reflect.DeepEqual(tmpFileData, data) {
+					t.Fatalf("Data mismatches; got something of length %d and expected %d",
+						len(data), len(tmpFileData))
+				}
+
+				os.RemoveAll(itemDir)
 			}
 
 			if err := f.Close(); err != nil {
