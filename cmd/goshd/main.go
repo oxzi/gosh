@@ -25,10 +25,13 @@ var (
 func init() {
 	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
 
-	var maxLifetimeStr string
+	var (
+		maxLifetimeStr string
+		maxFilesizeStr string
+	)
 
 	flag.StringVar(&storePath, "store", "", "Path to the store")
-	flag.Int64Var(&maxFilesize, "max-filesize", 50*1024*1024, "Maximum file size in bytes")
+	flag.StringVar(&maxFilesizeStr, "max-filesize", "10MiB", "Maximum file size in bytes")
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
 	flag.StringVar(&listenAddr, "listen", ":8080", "Listen address for the HTTP server")
@@ -44,6 +47,12 @@ func init() {
 		log.WithError(err).Fatal("Failed to parse lifetime")
 	} else {
 		maxLifetime = lt
+	}
+
+	if bs, err := gosh.ParseBytesize(maxFilesizeStr); err != nil {
+		log.WithError(err).Fatal("Failed to parse byte size")
+	} else {
+		maxFilesize = bs
 	}
 
 	if storePath == "" {

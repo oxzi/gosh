@@ -101,7 +101,8 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	}()
 
 	if fileHeader.Size > maxSize {
-		err = fmt.Errorf("File size %d exceeds maximum %d", fileHeader.Size, maxSize)
+		err = fmt.Errorf("File size %s exceeds maximum %s",
+			PrettyBytesize(fileHeader.Size), PrettyBytesize(maxSize))
 		return
 	} else if fileHeader.Size == 0 {
 		err = fmt.Errorf("File size is zero")

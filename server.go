@@ -126,7 +126,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		EMail    string
 	}{
 		Expires:  PrettyDuration(serv.maxLifetime),
-		Size:     fmt.Sprintf("%d Bytes", serv.maxSize),
+		Size:     PrettyBytesize(serv.maxSize),
 		Hostname: r.Host,
 		EMail:    serv.contactMail,
 	}
