@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestOwnerType(t *testing.T) {
@@ -75,16 +76,19 @@ func TestItem(t *testing.T) {
 		size             int64
 		filename         string
 		burnAfterReading bool
+		lifetime         string
 
 		valid bool
 	}{
-		{0, "", false, false},
-		{1, "test.jpg", false, true},
-		{1, "test.jpg", true, true},
-		{1024, "test.jpg", false, true},
-		{1024, "test.jpg", true, true},
-		{1024, "", false, false},
-		{1025, "", false, false},
+		{0, "", false, "", false},
+		{1, "test.jpg", false, "", true},
+		{1, "test.jpg", true, "", true},
+		{1, "test.jpg", false, "1m", true},
+		{1024, "test.jpg", false, "", true},
+		{1024, "test.jpg", true, "", true},
+		{1024, "test.jpg", true, "23s", true},
+		{1024, "", false, "", false},
+		{1025, "", false, "", false},
 	}
 
 	for _, test := range tests {
@@ -112,6 +116,14 @@ func TestItem(t *testing.T) {
 			}
 		}
 
+		if test.lifetime != "" {
+			if w, err := writer.CreateFormField(formLifetime); err != nil {
+				t.Fatal(err)
+			} else if _, err := w.Write([]byte(test.lifetime)); err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		if err := writer.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +134,7 @@ func TestItem(t *testing.T) {
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.RemoteAddr = "[fe80::42]:2342"
 
-			i, f, err := NewItem(r, maxFilesize)
+			i, f, err := NewItem(r, maxFilesize, time.Hour)
 			if (err == nil) != test.valid {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
@@ -140,6 +152,17 @@ func TestItem(t *testing.T) {
 			if i.BurnAfterReading != test.burnAfterReading {
 				t.Fatalf("Burn After Reading mismatches, got %t and expected %t",
 					i.BurnAfterReading, test.burnAfterReading)
+			}
+
+			if test.lifetime != "" {
+				dur, _ := time.ParseDuration(test.lifetime)
+				if iDur := i.Expires.Sub(i.Created); iDur != dur {
+					t.Fatalf("Expected duration of %v, got %v", dur, iDur)
+				}
+			} else {
+				if iDur := i.Expires.Sub(i.Created); iDur != time.Hour {
+					t.Fatalf("Expected duration of %v, got %v", time.Hour, iDur)
+				}
 			}
 
 			if itemDir, err := ioutil.TempDir("", ""); err != nil {

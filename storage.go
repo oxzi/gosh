@@ -141,7 +141,7 @@ func (s *Store) Get(id string) (i Item, err error) {
 	} else if err == nil && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
-			"Expires": i.Expires,
+			"expires": i.Expires,
 		}).Info("Requested Item is expired, will be deleted")
 
 		if err := s.Delete(i); err != nil {

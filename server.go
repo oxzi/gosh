@@ -11,11 +11,12 @@ import (
 )
 
 type Server struct {
-	store   *Store
-	maxSize int64
+	store       *Store
+	maxSize     int64
+	maxLifetime time.Duration
 }
 
-func NewServer(storeDirectory string, maxSize int64) (s *Server, err error) {
+func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration) (s *Server, err error) {
 	store, storeErr := NewStore(storeDirectory)
 	if storeErr != nil {
 		err = storeErr
@@ -23,8 +24,9 @@ func NewServer(storeDirectory string, maxSize int64) (s *Server, err error) {
 	}
 
 	s = &Server{
-		store:   store,
-		maxSize: maxSize,
+		store:       store,
+		maxSize:     maxSize,
+		maxLifetime: maxLifetime,
 	}
 	return
 }
@@ -61,15 +63,18 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	item, f, err := NewItem(r, serv.maxSize)
-	if err != nil {
+	item, f, err := NewItem(r, serv.maxSize, serv.maxLifetime)
+	if err == ErrLifetimeToLong {
+		log.Info("New Item with a too great lifetime was rejected")
+
+		http.Error(w, "Lifetime exceeds maximum", http.StatusNotAcceptable)
+		return
+	} else if err != nil {
 		log.WithError(err).Warn("Failed to create new Item")
 
 		http.Error(w, "Something went wrong.", http.StatusBadRequest)
 		return
 	}
-
-	item.Expires = time.Now().Add(30 * time.Second).UTC()
 
 	itemId, err := serv.store.Put(item, f)
 	if err != nil {
@@ -82,6 +87,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{
 		"ID":       itemId,
 		"filename": item.Filename,
+		"expires":  item.Expires,
 	}).Info("Uploaded new Item")
 
 	w.WriteHeader(http.StatusOK)
@@ -143,7 +149,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	server, err := NewServer("store", 10*1024*1024)
+	server, err := NewServer("store", 10*1024*1024, 10*time.Minute)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}

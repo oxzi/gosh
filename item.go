@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ import (
 const (
 	formFile             string = "file"
 	formBurnAfterReading string = "burn"
+	formLifetime         string = "time"
 )
 
 // OwnerType describes a possible type of an owner, as an IP address. This can
@@ -73,11 +75,14 @@ type Item struct {
 	Owner map[OwnerType]net.IP
 }
 
-// NewItem creates a new Item based on a Request. Neither the ID nor the
-// expiration date (Expires) are set yet. Furthermore, if no error has
-// occurred, a file is returned from which the file content should be read.
-// This file must be closed afterwards.
-func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err error) {
+// ErrLifetimeToLong is returned from NewOwnerTypes if the requested lifetime
+// exceeds the maximum lifetime.
+var ErrLifetimeToLong = errors.New("Lifetime is greater maximum lifetime")
+
+// NewItem creates a new Item based on a Request. The ID will be left empty.
+// Furthermore, if no error has occurred, a file is returned from which the
+// file content should be read. This file must be closed afterwards.
+func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item Item, file io.ReadCloser, err error) {
 	err = r.ParseMultipartForm(maxSize)
 	if err != nil {
 		return
@@ -117,6 +122,18 @@ func NewItem(r *http.Request, maxSize int64) (item Item, file io.ReadCloser, err
 	}
 
 	item.Created = time.Now().UTC()
+
+	if lifetime := r.FormValue(formLifetime); lifetime == "" {
+		item.Expires = item.Created.Add(maxLifetime)
+	} else if parseLt, parseLtErr := time.ParseDuration(lifetime); parseLtErr != nil {
+		err = parseLtErr
+		return
+	} else if parseLt > maxLifetime {
+		err = ErrLifetimeToLong
+		return
+	} else {
+		item.Expires = item.Created.Add(parseLt)
+	}
 
 	if item.Owner, err = NewOwnerTypes(r); err != nil {
 		return
