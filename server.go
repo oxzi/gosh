@@ -202,7 +202,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Content-Type", item.ContentType)
 		w.Header().Set("Content-Disposition",
-			fmt.Sprintf("attachment; filename=\"%s\"", item.Filename))
+			fmt.Sprintf("inline; filename=\"%s\"", item.Filename))
 		w.WriteHeader(http.StatusOK)
 
 		if _, err := io.Copy(w, f); err != nil {
