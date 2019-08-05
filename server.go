@@ -2,10 +2,10 @@ package gosh
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"strings"
+	"text/template"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -27,7 +27,7 @@ The gosh software can be obtained from <https://github.com/geistesk/gosh>.
 
 ## Posting
 
-POST your files over HTTP:
+HTTP POST your file:
 $ curl -F 'file=@foo.png' http://{{.Hostname}}/
 
 Burn after reading:
@@ -51,7 +51,7 @@ user information.
 ## Abuse
 
 If, for whatever reason, you would like to have a file removed prematurely,
-please write an e-mail to {{.EMail}}.
+please write an e-mail to <{{.EMail}}>.
 
 Please allow me a certain amount of time to react and work on your request.
 `
