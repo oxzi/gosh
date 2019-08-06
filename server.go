@@ -56,6 +56,14 @@ please write an e-mail to <{{.EMail}}>.
 Please allow me a certain amount of time to react and work on your request.
 `
 
+const (
+	msgFileSizeExceeds   = "Error: File size exceeds maximum."
+	msgGenericError      = "Error: Something went wrong."
+	msgLifetimeExceeds   = "Error: Lifetime exceeds maximum."
+	msgNotExists         = "Error: Does not exists."
+	msgUnsupportedMethod = "Error: Method not supported."
+)
+
 // Server implements an http.Handler for up- and download.
 type Server struct {
 	store       *Store
@@ -106,7 +114,7 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.WithField("method", r.Method).Debug("Called with unsupported method")
 
-		http.Error(w, "Method not supported.", http.StatusMethodNotAllowed)
+		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -115,7 +123,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.WithError(err).Warn("Failed to parse template")
 
-		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
@@ -144,12 +152,17 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err == ErrLifetimeToLong {
 		log.Info("New Item with a too great lifetime was rejected")
 
-		http.Error(w, "Lifetime exceeds maximum", http.StatusNotAcceptable)
+		http.Error(w, msgLifetimeExceeds, http.StatusNotAcceptable)
+		return
+	} else if err == ErrFileToBig {
+		log.Info("New Item with a too great file size was rejected")
+
+		http.Error(w, msgFileSizeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err != nil {
 		log.WithError(err).Warn("Failed to create new Item")
 
-		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
@@ -157,7 +170,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.WithError(err).Warn("Failed to store Item")
 
-		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
@@ -175,7 +188,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		log.WithField("method", r.Method).Debug("Request got wrong method")
 
-		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -185,19 +198,19 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
-		http.Error(w, "Does not exists.", http.StatusNotFound)
+		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
 		log.WithError(err).WithField("ID", reqId).Warn("Requesting errored")
 
-		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	if f, err := serv.store.GetFile(item); err != nil {
 		log.WithError(err).WithField("ID", item.ID).Warn("Reading file errored")
 
-		http.Error(w, "Something went wrong.", http.StatusBadRequest)
+		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	} else {
 		w.Header().Set("Content-Type", item.ContentType)

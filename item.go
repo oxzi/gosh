@@ -75,9 +75,11 @@ type Item struct {
 	Owner map[OwnerType]net.IP
 }
 
-// ErrLifetimeToLong is returned from NewOwnerTypes if the requested lifetime
-// exceeds the maximum lifetime.
-var ErrLifetimeToLong = errors.New("Lifetime is greater maximum lifetime")
+var (
+	ErrLifetimeToLong = errors.New("Lifetime is greater maximum lifetime")
+
+	ErrFileToBig = errors.New("File size is greater maxium filesize")
+)
 
 // NewItem creates a new Item based on a Request. The ID will be left empty.
 // Furthermore, if no error has occurred, a file is returned from which the
@@ -101,8 +103,7 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	}()
 
 	if fileHeader.Size > maxSize {
-		err = fmt.Errorf("File size %s exceeds maximum %s",
-			PrettyBytesize(fileHeader.Size), PrettyBytesize(maxSize))
+		err = ErrFileToBig
 		return
 	} else if fileHeader.Size == 0 {
 		err = fmt.Errorf("File size is zero")
