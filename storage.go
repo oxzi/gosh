@@ -154,8 +154,8 @@ func (s *Store) Get(id string) (i Item, err error) {
 	return
 }
 
-// GetFile creates a Reader to the Item's file.
-func (s *Store) GetFile(i Item) (io.Reader, error) {
+// GetFile creates a ReadCloser to the Item's file.
+func (s *Store) GetFile(i Item) (io.ReadCloser, error) {
 	return i.ReadFile(s.storageDir())
 }
 

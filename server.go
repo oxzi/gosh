@@ -211,6 +211,10 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 			log.WithError(err).WithField("ID", item.ID).Warn("Writing file errored")
 		}
 
+		if err := f.Close(); err != nil {
+			log.WithError(err).WithField("ID", item.ID).Warn("Closing file errored")
+		}
+
 		log.WithFields(log.Fields{
 			"ID":       item.ID,
 			"filename": item.Filename,

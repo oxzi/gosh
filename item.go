@@ -165,8 +165,8 @@ func (i Item) WriteFile(file io.ReadCloser, directory string) error {
 	return file.Close()
 }
 
-// ReadFile deserializes the file of an Item from the given directory into a Reader.
-func (i Item) ReadFile(directory string) (io.Reader, error) {
+// ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
+func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
 	return os.Open(i.targetFile(directory))
 }
 
