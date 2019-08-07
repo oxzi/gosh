@@ -19,6 +19,9 @@ login or authentication. All files have a maximum lifetime and are then deleted.
 
 
 ## Installation
+### Generic Installation
+
+The system needs to have Go installed in version 1.11 or later.
 
 ```bash
 git clone https://github.com/geistesk/gosh.git
@@ -26,6 +29,49 @@ cd gosh
 
 go build ./cmd/goshd
 go build ./cmd/gosh-query
+```
+
+### NixOS Module
+
+On a NixOS system one can `import` this repository and configure gosh.
+
+```nix
+# Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
+
+{ config, pkgs, ... }:
+{
+  imports = [ /path/to/gosh/repo ];
+
+  services = {
+    gosh = {
+      enable = true;
+      contactMail = "abuse@example.com";
+      listenAddress = "127.0.0.1:30100";
+
+      maxFilesize = "64MiB";
+      maxLifetime = "1w";
+
+      mimeMap = [
+        { from = "text/html"; to = "text/plain"; }
+      ];
+    };
+
+    nginx = {
+      enable = true;
+
+      recommendedTlsSettings = true;
+      # This one is important.
+      recommendedProxySettings = true;
+
+      virtualHosts."gosh.example.com" = {
+        enableACME = true;
+        forceSSL = true;
+
+        locations."/".proxyPass = "http://127.0.0.1:30100/";
+      };
+    };
+  };
+}
 ```
 
 
@@ -122,3 +168,11 @@ curl -F 'file=@foo.png' -F 'time=1d' http://our-server.example/
 # Or all together:
 curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
 ```
+
+
+## Related Work
+
+Of course, there are already similar projects, for example:
+
+- [0x0](https://github.com/lachs0r/0x0)
+- [Pomf](https://github.com/pomf/pomf)
