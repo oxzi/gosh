@@ -59,6 +59,7 @@ Please allow me a certain amount of time to react and work on your request.
 const (
 	msgFileSizeExceeds   = "Error: File size exceeds maximum."
 	msgGenericError      = "Error: Something went wrong."
+	msgIllegalMime       = "Error: MIME type is blacklisted."
 	msgLifetimeExceeds   = "Error: Lifetime exceeds maximum."
 	msgNotExists         = "Error: Does not exists."
 	msgUnsupportedMethod = "Error: Method not supported."
@@ -70,11 +71,13 @@ type Server struct {
 	maxSize     int64
 	maxLifetime time.Duration
 	contactMail string
+	mimeMap     MimeMap
 }
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
-func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, contactMail string) (s *Server, err error) {
+func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
+	contactMail string, mimeMap MimeMap) (s *Server, err error) {
 	store, storeErr := NewStore(storeDirectory, true)
 	if storeErr != nil {
 		err = storeErr
@@ -86,6 +89,7 @@ func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, 
 		maxSize:     maxSize,
 		maxLifetime: maxLifetime,
 		contactMail: contactMail,
+		mimeMap:     mimeMap,
 	}
 	return
 }
@@ -164,6 +168,11 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
+	} else if serv.mimeMap.MustDrop(item.ContentType) {
+		log.WithField("MIME", item.ContentType).Info("Prevented upload of an illegal MIME")
+
+		http.Error(w, msgIllegalMime, http.StatusBadRequest)
+		return
 	}
 
 	itemId, err := serv.store.Put(item, f)
@@ -213,7 +222,15 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	} else {
-		w.Header().Set("Content-Type", item.ContentType)
+		mimeType, mimeErr := serv.mimeMap.Substitute(item.ContentType)
+		if mimeErr != nil {
+			log.WithError(err).WithField("ID", item.ID).Warn("Substituting MIME errored")
+
+			http.Error(w, msgGenericError, http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", mimeType)
 		w.Header().Set("Content-Disposition",
 			fmt.Sprintf("inline; filename=\"%s\"", item.Filename))
 		w.WriteHeader(http.StatusOK)

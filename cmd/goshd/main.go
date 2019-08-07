@@ -18,6 +18,7 @@ var (
 	maxFilesize int64
 	maxLifetime time.Duration
 	contactMail string
+	mimeMap     gosh.MimeMap
 	listenAddr  string
 	verbose     bool
 )
@@ -28,12 +29,14 @@ func init() {
 	var (
 		maxLifetimeStr string
 		maxFilesizeStr string
+		mimeMapStr     string
 	)
 
 	flag.StringVar(&storePath, "store", "", "Path to the store")
 	flag.StringVar(&maxFilesizeStr, "max-filesize", "10MiB", "Maximum file size in bytes")
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
+	flag.StringVar(&mimeMapStr, "mimemap", "", "MimeMap to substitute/drop MIMEs")
 	flag.StringVar(&listenAddr, "listen", ":8080", "Listen address for the HTTP server")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 
@@ -53,6 +56,19 @@ func init() {
 		log.WithError(err).Fatal("Failed to parse byte size")
 	} else {
 		maxFilesize = bs
+	}
+
+	if mimeMapStr == "" {
+		mimeMap = make(gosh.MimeMap)
+	} else {
+		if f, err := os.Open(mimeMapStr); err != nil {
+			log.WithError(err).Fatal("Failed to open MimeMap")
+		} else if mm, err := gosh.NewMimeMap(f); err != nil {
+			log.WithError(err).Fatal("Failed to parse MimeMap")
+		} else {
+			f.Close()
+			mimeMap = mm
+		}
 	}
 
 	if storePath == "" {
@@ -89,7 +105,8 @@ func webserver(server *gosh.Server) {
 }
 
 func main() {
-	server, err := gosh.NewServer(storePath, maxFilesize, maxLifetime, contactMail)
+	server, err := gosh.NewServer(
+		storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
