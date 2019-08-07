@@ -40,7 +40,7 @@ func TestStore(t *testing.T) {
 	}
 	defer os.RemoveAll(storageDir)
 
-	store, err := NewStore(storageDir)
+	store, err := NewStore(storageDir, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestStoreCreateId(t *testing.T) {
 	}
 	defer os.RemoveAll(storageDir)
 
-	store, err := NewStore(storageDir)
+	store, err := NewStore(storageDir, false)
 	if err != nil {
 		t.Fatal(err)
 	}

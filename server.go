@@ -75,7 +75,7 @@ type Server struct {
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
 func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration, contactMail string) (s *Server, err error) {
-	store, storeErr := NewStore(storeDirectory)
+	store, storeErr := NewStore(storeDirectory, true)
 	if storeErr != nil {
 		err = storeErr
 		return

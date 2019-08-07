@@ -29,17 +29,17 @@ type Store struct {
 
 	bh *badgerhold.Store
 
-	stopSyn chan struct{}
-	stopAck chan struct{}
+	hasCleanup bool
+	stopSyn    chan struct{}
+	stopAck    chan struct{}
 }
 
-// NewStore opens or initializes a Store in the given directory.
-func NewStore(baseDir string) (s *Store, err error) {
+// NewStore opens or initializes a Store in the given directory. A background
+// task for continuous cleaning can be activated.
+func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 	s = &Store{
-		baseDir: baseDir,
-
-		stopSyn: make(chan struct{}),
-		stopAck: make(chan struct{}),
+		baseDir:    baseDir,
+		hasCleanup: backgroundCleanup,
 	}
 
 	log.WithField("directory", baseDir).Info("Opening Store")
@@ -61,7 +61,12 @@ func NewStore(baseDir string) (s *Store, err error) {
 		return
 	}
 
-	go s.cleanupExired()
+	if s.hasCleanup {
+		s.stopSyn = make(chan struct{})
+		s.stopAck = make(chan struct{})
+
+		go s.cleanupExired()
+	}
 
 	return
 }
@@ -122,8 +127,10 @@ func (s *Store) createID() (id string, err error) {
 func (s *Store) Close() error {
 	log.Info("Closing Store")
 
-	close(s.stopSyn)
-	<-s.stopAck
+	if s.hasCleanup {
+		close(s.stopSyn)
+		<-s.stopAck
+	}
 
 	return s.bh.Close()
 }
