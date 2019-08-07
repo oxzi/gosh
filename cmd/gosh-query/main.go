@@ -96,10 +96,20 @@ func main() {
 	}
 
 	if items, itemsErr := query(store); itemsErr != nil {
-		log.WithError(itemsErr).Fatal("Failed to execute query")
+		log.WithError(itemsErr).Warn("Failed to execute query")
 	} else {
-		for _, item := range items {
-			prettyPrintItem(item)
+		if modeDelete {
+			for _, item := range items {
+				log.WithField("ID", item.ID).Info("Deleting Item")
+
+				if err := store.Delete(item); err != nil {
+					log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
+				}
+			}
+		} else {
+			for _, item := range items {
+				prettyPrintItem(item)
+			}
 		}
 	}
 
