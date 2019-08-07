@@ -22,7 +22,7 @@ func query(store *gosh.Store) (items []gosh.Item, err error) {
 }
 
 func queryId(id string, store *gosh.Store) (items []gosh.Item, err error) {
-	if item, itemErr := store.Get(id); itemErr != nil {
+	if item, itemErr := store.Get(id, false); itemErr != nil {
 		err = itemErr
 	} else {
 		items = []gosh.Item{item}

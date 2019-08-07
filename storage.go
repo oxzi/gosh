@@ -136,7 +136,7 @@ func (s *Store) Close() error {
 }
 
 // Get an Item by its ID. The Item's file can be accessed with GetFile.
-func (s *Store) Get(id string) (i Item, err error) {
+func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 	log.WithField("ID", id).Debug("Requested Item from Store")
 
 	err = s.bh.Get(id, &i)
@@ -145,7 +145,7 @@ func (s *Store) Get(id string) (i Item, err error) {
 		err = ErrNotFound
 	} else if err != nil {
 		log.WithField("ID", id).WithError(err).Warn("Requested Item errored")
-	} else if err == nil && i.Expires.Before(time.Now()) {
+	} else if err == nil && delExpired && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
 			"expires": i.Expires,

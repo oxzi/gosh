@@ -194,7 +194,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	reqId := strings.TrimLeft(r.URL.Path, "/")
 
-	item, err := serv.store.Get(reqId)
+	item, err := serv.store.Get(reqId, true)
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 

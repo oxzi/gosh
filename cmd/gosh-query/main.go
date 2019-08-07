@@ -70,6 +70,20 @@ func checkStorePath(storep string) (err error) {
 	return
 }
 
+func prettyPrintItem(item gosh.Item) {
+	log.Infof("### Item: %s", item.ID)
+	log.Infof(" - Filename: %s (%s)", item.Filename, item.ContentType)
+	log.Infof(" - Burn After Reading: %t", item.BurnAfterReading)
+	log.Infof(" - Created: %v", item.Created)
+	log.Infof(" - Expires: %v", item.Expires)
+
+	for ipK, ipV := range item.Owner {
+		log.Infof(" - IP, %s: %v", ipK, ipV)
+	}
+
+	log.Infof("")
+}
+
 func main() {
 	storep := getStorePath()
 	if err := checkStorePath(storep); err != nil {
@@ -85,7 +99,7 @@ func main() {
 		log.WithError(itemsErr).Fatal("Failed to execute query")
 	} else {
 		for _, item := range items {
-			log.Info(item)
+			prettyPrintItem(item)
 		}
 	}
 
