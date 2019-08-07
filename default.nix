@@ -67,6 +67,8 @@ in {
   };
 
   config = mkIf cfg.enable {
+    environment.systemPackages = [ gosh ];
+
     systemd.services.gosh = {
       description = "gosh! Go Share";
 
