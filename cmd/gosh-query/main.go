@@ -1,0 +1,95 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"net"
+	"os"
+	"path"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/geistesk/gosh"
+)
+
+var (
+	storePath  string
+	verbose    bool
+	modeDelete bool
+
+	id        string
+	ipAddress net.IP
+)
+
+func init() {
+	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
+
+	var ipAddressStr string
+
+	flag.StringVar(&storePath, "store", "", "Path to the store, env variable GOSHSTORE can also be used")
+	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	flag.BoolVar(&modeDelete, "delete", false, "Delete selection")
+	flag.StringVar(&id, "id", "", "Query for an ID")
+	flag.StringVar(&ipAddressStr, "ip-addr", "", "Query for an IP address")
+
+	flag.Parse()
+
+	if verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	if ipAddressStr != "" {
+		ipAddress = net.ParseIP(ipAddressStr)
+	}
+}
+
+func getStorePath() string {
+	if storePath != "" {
+		return storePath
+	} else if envPath := os.Getenv("GOSHSTORE"); envPath != "" {
+		return envPath
+	} else {
+		return "."
+	}
+}
+
+func checkStorePath(storep string) (err error) {
+	dirs := []string{
+		storep,
+		path.Join(storep, gosh.DirDatabase),
+		path.Join(storep, gosh.DirStorage),
+	}
+
+	for _, dir := range dirs {
+		if _, stat := os.Stat(dir); os.IsNotExist(stat) {
+			err = fmt.Errorf("Required directory %s does not exist", dir)
+			return
+		}
+	}
+
+	return
+}
+
+func main() {
+	storep := getStorePath()
+	if err := checkStorePath(storep); err != nil {
+		log.WithError(err).WithField("path", storep).Fatal("Failed to load store")
+	}
+
+	store, err := gosh.NewStore(storep, false)
+	if err != nil {
+		log.WithError(err).WithField("path", storep).Fatal("Failed to start store")
+	}
+
+	if items, itemsErr := query(store); itemsErr != nil {
+		log.WithError(itemsErr).Fatal("Failed to execute query")
+	} else {
+		for _, item := range items {
+			log.Info(item)
+		}
+	}
+
+	if err := store.Close(); err != nil {
+		log.WithError(err).Fatal("Closing errored")
+	}
+}

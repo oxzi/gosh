@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	dirDatabase = "db"
-	dirStorage  = "data"
+	DirDatabase = "db"
+	DirStorage  = "data"
 )
 
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
@@ -73,12 +73,12 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 
 // databaseDir returns the database subdirectory.
 func (s Store) databaseDir() string {
-	return filepath.Join(s.baseDir, dirDatabase)
+	return filepath.Join(s.baseDir, DirDatabase)
 }
 
 // storageDir returns the file storage subdirectory.
 func (s Store) storageDir() string {
-	return filepath.Join(s.baseDir, dirStorage)
+	return filepath.Join(s.baseDir, DirStorage)
 }
 
 // cleanupExired runs in a background goroutine to clean up expired Items.
@@ -228,4 +228,9 @@ func (s *Store) Delete(i Item) (err error) {
 	}
 
 	return
+}
+
+// BadgerHold returns a reference to the underlying BadgerHold instance.
+func (s *Store) BadgerHold() *badgerhold.Store {
+	return s.bh
 }
