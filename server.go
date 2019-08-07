@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const indexTpl = `# gosh, Go Share
+const indexTpl = `# gosh! Go Share
 
 Upload your files to this server and share them with your friends or, if
 non-existent, shady people from the Internet. Your file will expire after
