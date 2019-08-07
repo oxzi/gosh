@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -79,6 +80,8 @@ var (
 	ErrLifetimeToLong = errors.New("Lifetime is greater maximum lifetime")
 
 	ErrFileToBig = errors.New("File size is greater maxium filesize")
+
+	filenamePattern = regexp.MustCompile(`[^0-9A-Za-z-_.]`)
 )
 
 // NewItem creates a new Item based on a Request. The ID will be left empty.
@@ -114,7 +117,8 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 		item.BurnAfterReading = true
 	}
 
-	item.Filename = filepath.Base(filepath.Clean(fileHeader.Filename))
+	item.Filename = filenamePattern.ReplaceAllString(
+		filepath.Base(filepath.Clean(fileHeader.Filename)), "_")
 
 	if contentType := fileHeader.Header.Get("Content-Type"); contentType == "" {
 		err = fmt.Errorf("Failed to get a Content-Type from file header")
