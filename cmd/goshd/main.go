@@ -98,10 +98,11 @@ func webserver(server *gosh.Server) {
 	<-stopChan
 	log.Info("Closing web server")
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Second)
 	if err := webServer.Shutdown(ctx); err != nil {
 		log.WithError(err).Fatal("Failed to shutdown web server")
 	}
+	ctxCancel()
 }
 
 func main() {
