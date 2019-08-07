@@ -28,16 +28,16 @@ The gosh software can be obtained from <https://github.com/geistesk/gosh>.
 ## Posting
 
 HTTP POST your file:
-$ curl -F 'file=@foo.png' http://{{.Hostname}}/
+$ curl -F 'file=@foo.png' {{.Proto}}://{{.Hostname}}/
 
 Burn after reading:
-$ curl -F 'file=@foo.png' -F 'burn=1' http://{{.Hostname}}/
+$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}/
 
 Set a custom expiry date, e.g., one minute:
-$ curl -F 'file=@foo.png' -F 'time=1m' http://{{.Hostname}}/
+$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}/
 
 Or all together:
-$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' http://{{.Hostname}}/
+$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/
 
 
 ## Privacy
@@ -134,11 +134,13 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Expires  string
 		Size     string
+		Proto    string
 		Hostname string
 		EMail    string
 	}{
 		Expires:  PrettyDuration(serv.maxLifetime),
 		Size:     PrettyBytesize(serv.maxSize),
+		Proto:    WebProtocol(r),
 		Hostname: r.Host,
 		EMail:    serv.contactMail,
 	}
@@ -190,7 +192,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}).Info("Uploaded new Item")
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "http://%s/%s\n", r.Host, itemId)
+	fmt.Fprintf(w, "%s://%s/%s\n", WebProtocol(r), r.Host, itemId)
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -256,5 +258,14 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		if err := serv.store.Delete(item); err != nil {
 			log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
 		}
+	}
+}
+
+// WebProtocol returns "http" or "https", based on the X-Forwarded-Proto header.
+func WebProtocol(r *http.Request) string {
+	if xfwp := r.Header.Get("X-Forwarded-Proto"); xfwp != "" {
+		return xfwp
+	} else {
+		return "http"
 	}
 }
