@@ -3,14 +3,17 @@
 with lib;
 
 let
-  gosh-id = 9001;
-
   gosh = pkgs.buildGoModule {
     name = "gosh";
 
     src = lib.cleanSource ./.;
     modSha256 = "0fnsd662p9v9ly9cy14asnv4gyx1xfnrn19abiyk3z098i4f0k7d";
   };
+
+  gosh-uid = 9001;
+
+  mimeMap = pkgs.writeText "goshd-mimemap" (
+    map (x: "${x.from} ${x.to}") cfg.mimeMap);
 
   cfg = config.services.gosh;
 in {
@@ -37,21 +40,34 @@ in {
     maxFilesize = mkOption {
       default = "10MiB";
       type = types.str;
-      description = "Maximum file size for uploads";
+      description = "Maximum file size for uploads.";
     };
 
     maxLifetime = mkOption {
       default = "24h";
       example = "2m";
       type = types.str;
-      description = "Maximum lifetime for uploads";
+      description = "Maximum lifetime for uploads.";
+    };
+
+    mimeMap = mkOption {
+      default = [];
+      example = [
+        { from = "text/html"; to = "text/plain"; }
+        { from = "image/gif"; to = "DROP"; }
+      ];
+      type = with types; listOf (submodule {
+        options = {
+          from = mkOption { type = str; };
+          to   = mkOption { type = str; };
+        };
+      });
+      description = "Map MIME types to others or DROP them.";
     };
   };
 
-  # TODO: MimeMap
-
-  config = {
-    systemd.services.gosh = mkIf cfg.enable {
+  config = mkIf cfg.enable {
+    systemd.services.gosh = {
       description = "gosh! Go Share";
 
       after = [ "network.target" ];
@@ -64,6 +80,7 @@ in {
             -listen ${cfg.listenAddress} \
             -max-filesize ${cfg.maxFilesize} \
             -max-lifetime ${cfg.maxLifetime} \
+            -mimemap ${mimeMap} \
             -store ${cfg.dataDir}
         '';
 
@@ -78,9 +95,9 @@ in {
       group = "gosh";
       home = cfg.dataDir;
       createHome = true;
-      uid = gosh-id;
+      uid = gosh-uid;
     };
 
-    users.groups.gosh.gid = gosh-id;
+    users.groups.gosh.gid = gosh-uid;
   };
 }
