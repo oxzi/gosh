@@ -169,6 +169,12 @@ curl -F 'file=@foo.png' -F 'time=1d' http://our-server.example/
 curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
 ```
 
+## Shell function
+
+A `fish`-funtion allow to easily upload a file to the server of your
+choice which needs to manually edited. With the `-b` or `--burn` flags
+you may decide to burn the file after reading.
+
 
 ## Related Work
 
