@@ -11,7 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const indexTpl = `<html>
+const indexTpl = `<!DOCTYPE html>
+<html>
 <head>
   <style>
 	* {
