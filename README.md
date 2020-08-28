@@ -1,4 +1,4 @@
-# gosh! Go Share [![Build Status](https://travis-ci.org/geistesk/gosh.svg?branch=master)](https://travis-ci.org/geistesk/gosh)
+# gosh! Go Share [![Build Status](https://travis-ci.org/oxzi/gosh.svg?branch=master)](https://travis-ci.org/oxzi/gosh)
 
 gosh is a simple HTTP file server on which users can upload their files without
 login or authentication. All files have a maximum lifetime and are then deleted.
@@ -24,7 +24,7 @@ login or authentication. All files have a maximum lifetime and are then deleted.
 The system needs to have Go installed in version 1.11 or later.
 
 ```bash
-git clone https://github.com/geistesk/gosh.git
+git clone https://github.com/oxzi/gosh.git
 cd gosh
 
 go build ./cmd/goshd

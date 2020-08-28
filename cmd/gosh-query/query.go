@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/geistesk/gosh"
+	"github.com/oxzi/gosh"
 	"github.com/timshannon/badgerhold"
 )
 

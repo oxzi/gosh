@@ -22,7 +22,7 @@ file size is {{.Size}}.
 This is no place to share questionable or illegal data. Please use another
 service or stop it completely. Get some help.
 
-The gosh software can be obtained from <https://github.com/geistesk/gosh>.
+The gosh software can be obtained from <https://github.com/oxzi/gosh>.
 
 
 ## Posting

@@ -1,4 +1,4 @@
-module github.com/geistesk/gosh
+module github.com/oxzi/gosh
 
 go 1.14
 
