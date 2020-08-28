@@ -10,7 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/oxzi/gosh"
+	"github.com/oxzi/gosh/internal"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 	maxFilesize int64
 	maxLifetime time.Duration
 	contactMail string
-	mimeMap     gosh.MimeMap
+	mimeMap     internal.MimeMap
 	listenAddr  string
 	verbose     bool
 )
@@ -46,24 +46,24 @@ func init() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if lt, err := gosh.ParseDuration(maxLifetimeStr); err != nil {
+	if lt, err := internal.ParseDuration(maxLifetimeStr); err != nil {
 		log.WithError(err).Fatal("Failed to parse lifetime")
 	} else {
 		maxLifetime = lt
 	}
 
-	if bs, err := gosh.ParseBytesize(maxFilesizeStr); err != nil {
+	if bs, err := internal.ParseBytesize(maxFilesizeStr); err != nil {
 		log.WithError(err).Fatal("Failed to parse byte size")
 	} else {
 		maxFilesize = bs
 	}
 
 	if mimeMapStr == "" {
-		mimeMap = make(gosh.MimeMap)
+		mimeMap = make(internal.MimeMap)
 	} else {
 		if f, err := os.Open(mimeMapStr); err != nil {
 			log.WithError(err).Fatal("Failed to open MimeMap")
-		} else if mm, err := gosh.NewMimeMap(f); err != nil {
+		} else if mm, err := internal.NewMimeMap(f); err != nil {
 			log.WithError(err).Fatal("Failed to parse MimeMap")
 		} else {
 			f.Close()
@@ -78,7 +78,7 @@ func init() {
 	}
 }
 
-func webserver(server *gosh.Server) {
+func webserver(server *internal.Server) {
 	webServer := &http.Server{
 		Addr:    listenAddr,
 		Handler: server,
@@ -106,7 +106,7 @@ func webserver(server *gosh.Server) {
 }
 
 func main() {
-	server, err := gosh.NewServer(
+	server, err := internal.NewServer(
 		storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")

@@ -1,4 +1,4 @@
-package gosh
+package internal
 
 import (
 	"errors"

@@ -4,11 +4,12 @@ import (
 	"errors"
 	"net"
 
-	"github.com/oxzi/gosh"
+	"github.com/oxzi/gosh/internal"
+
 	"github.com/timshannon/badgerhold"
 )
 
-func query(store *gosh.Store) (items []gosh.Item, err error) {
+func query(store *internal.Store) (items []internal.Item, err error) {
 	if id != "" {
 		return queryId(id, store)
 	}
@@ -21,18 +22,18 @@ func query(store *gosh.Store) (items []gosh.Item, err error) {
 	return
 }
 
-func queryId(id string, store *gosh.Store) (items []gosh.Item, err error) {
+func queryId(id string, store *internal.Store) (items []internal.Item, err error) {
 	if item, itemErr := store.Get(id, false); itemErr != nil {
 		err = itemErr
 	} else {
-		items = []gosh.Item{item}
+		items = []internal.Item{item}
 	}
 	return
 }
 
-func queryIpAddr(ipAddress net.IP, store *gosh.Store) (items []gosh.Item, err error) {
+func queryIpAddr(ipAddress net.IP, store *internal.Store) (items []internal.Item, err error) {
 	matchIp := func(ra *badgerhold.RecordAccess) (match bool, err error) {
-		item := ra.Record().(*gosh.Item)
+		item := ra.Record().(*internal.Item)
 
 		for _, ownerMapIp := range item.Owner {
 			if ownerMapIp.Equal(ipAddress) {

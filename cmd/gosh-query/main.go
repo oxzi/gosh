@@ -9,7 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/oxzi/gosh"
+	"github.com/oxzi/gosh/internal"
 )
 
 var (
@@ -56,8 +56,8 @@ func getStorePath() string {
 func checkStorePath(storep string) (err error) {
 	dirs := []string{
 		storep,
-		path.Join(storep, gosh.DirDatabase),
-		path.Join(storep, gosh.DirStorage),
+		path.Join(storep, internal.DirDatabase),
+		path.Join(storep, internal.DirStorage),
 	}
 
 	for _, dir := range dirs {
@@ -70,7 +70,7 @@ func checkStorePath(storep string) (err error) {
 	return
 }
 
-func prettyPrintItem(item gosh.Item) {
+func prettyPrintItem(item internal.Item) {
 	log.Infof("### Item: %s", item.ID)
 	log.Infof(" - Filename: %s (%s)", item.Filename, item.ContentType)
 	log.Infof(" - Burn After Reading: %t", item.BurnAfterReading)
@@ -90,7 +90,7 @@ func main() {
 		log.WithError(err).WithField("path", storep).Fatal("Failed to load store")
 	}
 
-	store, err := gosh.NewStore(storep, false)
+	store, err := internal.NewStore(storep, false)
 	if err != nil {
 		log.WithError(err).WithField("path", storep).Fatal("Failed to start store")
 	}
