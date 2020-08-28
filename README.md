@@ -1,4 +1,4 @@
-# gosh! Go Share [![Build Status](https://travis-ci.org/oxzi/gosh.svg?branch=master)](https://travis-ci.org/oxzi/gosh)
+# gosh! Go Share ![CI](https://github.com/oxzi/gosh/workflows/CI/badge.svg)
 
 gosh is a simple HTTP file server on which users can upload their files without
 login or authentication. All files have a maximum lifetime and are then deleted.
