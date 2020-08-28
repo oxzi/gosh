@@ -153,7 +153,7 @@ $ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</
   <h2>## Abuse</h2>
 
   If, for whatever reason, you would like to have a file removed prematurely,
-  please write an e-mail to <{{.EMail}}>. Please allow me a certain amount of
+  please write an e-mail to <a href="mailto:{{.Email}}">&lt;{{.EMail}}&gt;</a>. Please allow me a certain amount of
   time to react and work on your request.
 </body>
 </html>`
