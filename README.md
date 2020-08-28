@@ -33,14 +33,15 @@ go build ./cmd/gosh-query
 
 ### NixOS Module
 
-On a NixOS system one can `import` this repository and configure gosh.
+On a NixOS system one can configure gosh as a module. Have look at the example
+in `contrib/nixos/`.
 
 ```nix
 # Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
 
 { config, pkgs, ... }:
 {
-  imports = [ /path/to/gosh/repo ];
+  imports = [ /path/to/gosh/repo/ ];
 
   services = {
     gosh = {
@@ -171,9 +172,11 @@ curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
 
 ## Shell function
 
-A `fish`-funtion allow to easily upload a file to the server of your
-choice which needs to manually edited. With the `-b` or `--burn` flags
-you may decide to burn the file after reading.
+### Fish, `contrib/fish/`
+
+A `fish`-funtion allow to easily upload a file to the server of your choice
+which needs to manually edited. With the `-b` or `--burn` flags you may decide
+to burn the file after reading.
 
 
 ## Related Work

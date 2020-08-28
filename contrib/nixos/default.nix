@@ -7,7 +7,8 @@ let
     name = "gosh";
 
     src = lib.cleanSource ./.;
-    modSha256 = "0fnsd662p9v9ly9cy14asnv4gyx1xfnrn19abiyk3z098i4f0k7d";
+    # TODO: One has to configure this one.
+    modSha256 = "0000000000000000000000000000000000000000000000000000";
   };
 
   gosh-uid = 9001;
