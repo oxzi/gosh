@@ -131,10 +131,10 @@ $ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</
         <input
           type="text"
           name="time"
-          pattern="([1-9]?[0-9]*(s|m|h|d|w|mo|y))+"
-          title="Please use a sequence of decimal
-		  numbers and a unit suffix. Valid time units are 's', 'm', 'h', 'd', 'w',
-		  'mo', 'y'."
+          pattern="{{.DurationPattern}}"
+          title="A duration string is sequence of decimal
+		  numbers, each with a unit suffix. Valid time units in order are 'y', 'mo', 'w', 'd', 'h',
+		  'm', 's'"
         />
       </div>
       <button>Upload</button>
@@ -232,17 +232,19 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Expires  string
-		Size     string
-		Proto    string
-		Hostname string
-		EMail    string
+		Expires         string
+		Size            string
+		Proto           string
+		Hostname        string
+		EMail           string
+		DurationPattern string
 	}{
 		Expires:  PrettyDuration(serv.maxLifetime),
 		Size:     PrettyBytesize(serv.maxSize),
 		Proto:    WebProtocol(r),
 		Hostname: r.Host,
 		EMail:    serv.contactMail,
+		DurationPattern: getDurationPattern(),
 	}
 
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
