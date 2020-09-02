@@ -13,146 +13,140 @@ import (
 
 const indexTpl = `<!DOCTYPE html>
 <html>
-  <head>
-    <style>
-      * {
-        font-family: monospace;
-      }
+	<head>
+		<style>
+			* {
+				font-family: monospace;
+			}
 
-      body {
-        margin: 0 auto;
-        padding: 1rem;
-        width: 50%;
-      }
+			body {
+				margin: 0 auto;
+				padding: 1rem;
+				width: 50%;
+			}
 
-      h1 {
-        padding-top: 3rem;
-      }
+			h1 {
+				padding-top: 3rem;
+			}
 
-      h2 {
-        padding-top: 2rem;
-      }
+			h2 {
+				padding-top: 2rem;
+			}
 
-      h3 {
-        padding-top: 1rem;
-      }
+			h3 {
+				padding-top: 1rem;
+			}
 
-      pre {
-        background-color: #eee;
-        padding: 0.5rem;
-      }
+			pre {
+				background-color: #eee;
+				padding: 0.5rem;
+			}
 
-      form {
-        padding: 0.5rem;
-        position: relative;
-        margin: auto;
-        background-color: #eee;
-      }
+			form {
+				padding: 0.5rem;
+				position: relative;
+				margin: auto;
+				background-color: #eee;
+			}
 
-      #grid {
-        display: grid;
-        grid-gap: 1rem;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: repeat(3, 3rem);
-        margin-bottom: 1rem;
-      }
+			#grid {
+				display: grid;
+				grid-gap: 1rem;
+				grid-template-columns: 1fr 1fr;
+				grid-template-rows: repeat(3, 3rem);
+				margin-bottom: 1rem;
+			}
 
-      #grid > * {
-        margin: auto 0;
-      }
+			#grid > * {
+				margin: auto 0;
+			}
 
-      #grid input[type="checkbox"] {
-        margin-right: auto;
-      }
+			#grid input[type="checkbox"] {
+				margin-right: auto;
+			}
 
-      button {
-        width: 100%;
-      }
-    </style>
-  </head>
+			button {
+				width: 100%;
+			}
+		</style>
+	</head>
 
-  <body>
-    <h1># gosh! Go Share</h1>
-    <p>
-      Upload your files to this server and share them with your friends or, if
-      non-existent, shady people from the Internet.
-    </p>
-    <p>
-      Your file will expire after {{.Expires}} or earlier, if explicitly
-      specified. Optionally, the file can be deleted directly after the first
-      retrieval. In addition, the maximum file size is {{.Size}}.
-    </p>
-    <p>
-      This is no place to share questionable or illegal data. Please use another
-      service or stop it completely. Get some help.
-    </p>
-    <p>
-      The gosh software can be obtained from
-      <a href="https://github.com/oxzi/gosh">https://github.com/oxzi/gosh</a>
-    </p>
+	<body>
+		<h1># gosh! Go Share</h1>
+		<p>
+			Upload your files to this server and share them with your friends or, if
+			non-existent, shady people from the Internet.
+		</p>
+		<p>
+			Your file will expire after {{.Expires}} or earlier, if explicitly
+			specified. Optionally, the file can be deleted directly after the first
+			retrieval. In addition, the maximum file size is {{.Size}}.
+		</p>
+		<p>
+			This is no place to share questionable or illegal data. Please use another
+			service or stop it completely. Get some help.
+		</p>
+		<p>
+			The gosh software can be obtained from
+			<a href="https://github.com/oxzi/gosh">https://github.com/oxzi/gosh</a>
+		</p>
 
-    <h2>## Posting</h2>
+		<h2>## Posting</h2>
 
-    <h3>### curl</h3>
+		<h3>### curl</h3>
 
-    HTTP POST your file:
+		HTTP POST your file:
 
-    <pre>$ curl -F 'file=@foo.png' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' {{.Proto}}://{{.Hostname}}/</pre>
 
-    Burn after reading:
+		Burn after reading:
 
-    <pre>$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
 
-    Set a custom expiry date, e.g., one minute:
+		Set a custom expiry date, e.g., one minute:
 
-    <pre>
-$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}/</pre
-    >
+		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}/</pre>
 
-    Or all together:
+		Or all together:
 
-    <pre>
-$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre
-    >
+		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
 
-    <h3>### form</h3>
+		<h3>### form</h3>
 
-    <form
-      action="{{.Proto}}://{{.Hostname}}/"
-      method="POST"
-      enctype="multipart/form-data"
-    >
-      <div id="grid">
-        <label for="file">Your file:</label>
-        <input type="file" name="file" />
-        <label for="burn">Burn after reading:</label>
-        <input type="checkbox" name="burn" value="1" />
-        <label for="time">Optionally, set a custom expiry date:</label>
-        <input
-          type="text"
-          name="time"
-          pattern="{{.DurationPattern}}"
-          title="A duration string is sequence of decimal
-		  numbers, each with a unit suffix. Valid time units in order are 'y', 'mo', 'w', 'd', 'h',
-		  'm', 's'"
-        />
-      </div>
-      <button>Upload</button>
-    </form>
-    <h2>## Privacy</h2>
+		<form
+			action="{{.Proto}}://{{.Hostname}}/"
+			method="POST"
+			enctype="multipart/form-data">
+			<div id="grid">
+				<label for="file">Your file:</label>
+				<input type="file" name="file" />
+				<label for="burn">Burn after reading:</label>
+				<input type="checkbox" name="burn" value="1" />
+				<label for="time">Optionally, set a custom expiry date:</label>
+				<input
+					type="text"
+					name="time"
+					pattern="{{.DurationPattern}}"
+					title="A duration string is sequence of decimal numbers, each with a unit suffix. Valid time units in order are 'y', 'mo', 'w', 'd', 'h', 'm', 's'"
+				/>
+			</div>
+			<button>Upload</button>
+		</form>
 
-    This software stores the IP address for each upload. This information is
-    stored as long as the file is available. In addition, the IP address of the
-    user might be loged in case of an error. A normal download is logged without
-    user information.
+		<h2>## Privacy</h2>
 
-    <h2>## Abuse</h2>
+		This software stores the IP address for each upload. This information is
+		stored as long as the file is available. In addition, the IP address of the
+		user might be logged in case of an error. A normal download is logged without
+		user information.
 
-    If, for whatever reason, you would like to have a file removed prematurely,
-    please write an e-mail to
-    <a href="mailto:{{.EMail}}">&lt;{{.EMail}}&gt;</a>. Please allow me a
-    certain amount of time to react and work on your request.
-  </body>
+		<h2>## Abuse</h2>
+
+		If, for whatever reason, you would like to have a file removed prematurely,
+		please write an e-mail to
+		<a href="mailto:{{.EMail}}">&lt;{{.EMail}}&gt;</a>. Please allow me a
+		certain amount of time to react and work on your request.
+	</body>
 </html>
 `
 
@@ -239,11 +233,11 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		EMail           string
 		DurationPattern string
 	}{
-		Expires:  PrettyDuration(serv.maxLifetime),
-		Size:     PrettyBytesize(serv.maxSize),
-		Proto:    WebProtocol(r),
-		Hostname: r.Host,
-		EMail:    serv.contactMail,
+		Expires:         PrettyDuration(serv.maxLifetime),
+		Size:            PrettyBytesize(serv.maxSize),
+		Proto:           WebProtocol(r),
+		Hostname:        r.Host,
+		EMail:           serv.contactMail,
 		DurationPattern: getHtmlDurationPattern(),
 	}
 
