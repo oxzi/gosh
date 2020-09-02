@@ -42,6 +42,17 @@ var (
 	ErrNoMatch = errors.New("Input does not match pattern")
 )
 
+// getHtmlDurationPattern creates a regular expression pattern to match duration strings within the browser.
+func getHtmlDurationPattern() string {
+	var b strings.Builder
+
+	for _, durElem := range durationsOrder {
+		_, _ = fmt.Fprintf(&b, `(\d+%s)?`, durElem)
+	}
+
+	return b.String()
+}
+
 // getDurationPattern compiles a regular expression to parse our duration string.
 func getDurationPattern() *regexp.Regexp {
 	if durationPattern != nil {
@@ -52,7 +63,7 @@ func getDurationPattern() *regexp.Regexp {
 
 	b.WriteString(`\A`)
 	for _, durElem := range durationsOrder {
-		fmt.Fprintf(&b, `((?P<%s>\d+)%s)?`, durElem, durElem)
+		_, _ = fmt.Fprintf(&b, `((?P<%s>\d+)%s)?`, durElem, durElem)
 	}
 	b.WriteString(`\z`)
 

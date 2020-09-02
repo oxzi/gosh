@@ -244,7 +244,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Proto:    WebProtocol(r),
 		Hostname: r.Host,
 		EMail:    serv.contactMail,
-		DurationPattern: getDurationPattern().String(),
+		DurationPattern: getHtmlDurationPattern(),
 	}
 
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
