@@ -150,7 +150,7 @@ $ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</
 
     If, for whatever reason, you would like to have a file removed prematurely,
     please write an e-mail to
-    <a href="mailto:{{.Email}}">&lt;{{.EMail}}&gt;</a>. Please allow me a
+    <a href="mailto:{{.EMail}}">&lt;{{.EMail}}&gt;</a>. Please allow me a
     certain amount of time to react and work on your request.
   </body>
 </html>
@@ -244,7 +244,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Proto:    WebProtocol(r),
 		Hostname: r.Host,
 		EMail:    serv.contactMail,
-		DurationPattern: getDurationPattern(),
+		DurationPattern: getDurationPattern().String(),
 	}
 
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
