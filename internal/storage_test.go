@@ -105,7 +105,7 @@ func TestStoreCreateId(t *testing.T) {
 		}
 
 		if _, exists := idCheck[id]; exists {
-			t.Fatalf("ID %s does already exists", id)
+			t.Fatalf("ID %s does already exist", id)
 		} else {
 			idCheck[id] = struct{}{}
 		}
