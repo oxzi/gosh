@@ -155,7 +155,7 @@ const (
 	msgGenericError      = "Error: Something went wrong."
 	msgIllegalMime       = "Error: MIME type is blacklisted."
 	msgLifetimeExceeds   = "Error: Lifetime exceeds maximum."
-	msgNotExists         = "Error: Does not exists."
+	msgNotExists         = "Error: Does not exist."
 	msgUnsupportedMethod = "Error: Method not supported."
 )
 
