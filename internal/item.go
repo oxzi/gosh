@@ -1,15 +1,19 @@
 package internal
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -69,6 +73,7 @@ type Item struct {
 
 	Filename    string
 	ContentType string
+	Chunks      uint
 
 	Created time.Time
 	Expires time.Time `badgerholdIndex:"Expires"`
@@ -148,34 +153,81 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	return
 }
 
-// targetFile returns the path to the Item's file.
-func (i Item) targetFile(directory string) string {
+// targetDirectory returns the path to the Item's file.
+func (i Item) targetDirectory(directory string) string {
 	return filepath.Join(directory, i.ID)
 }
 
 // WriteFile serializes the file of an Item in the given directory. The file
 // name will be the ID of the Item.
-func (i Item) WriteFile(file io.ReadCloser, directory string) error {
-	f, err := os.Create(i.targetFile(directory))
+func (i Item) WriteFile(file io.ReadCloser, directory string) (uint, error) {
+	chunkFolder := i.targetDirectory(directory)
+	err := os.Mkdir(chunkFolder, 0700)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	defer f.Close()
+	buff := make([]byte, ChunkSize)
+	var chunkNumber uint = 0
 
-	if _, err := io.Copy(f, file); err != nil {
-		return err
+	for {
+		n, err := file.Read(buff)
+		if err == io.EOF {
+			log.WithFields(log.Fields{
+				"chunks": chunkNumber,
+			}).Debug("Wrote chunked file")
+			break
+		}
+		if err != nil {
+			return 0, err
+		}
+
+		if n > 0 {
+			filename := fmt.Sprintf("%v.chunk", chunkNumber)
+			f, err := os.Create(filepath.Join(chunkFolder, filename))
+			if err != nil {
+				return 0, err
+			}
+
+			_, err = f.Write(buff[:n])
+			if err != nil {
+				return 0, err
+			}
+			chunkNumber += 1
+		}
 	}
 
-	return file.Close()
+	return chunkNumber, file.Close()
 }
 
 // ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
 func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
-	return os.Open(i.targetFile(directory))
+	var content bytes.Buffer
+	var chunkNumber uint = 0
+	chunkFolder := i.targetDirectory(directory)
+	buff := make([]byte, ChunkSize)
+
+	for ; chunkNumber < i.Chunks; chunkNumber++ {
+		filename := fmt.Sprintf("%v.chunk", chunkNumber)
+		file, err := os.Open(filepath.Join(chunkFolder, filename))
+		if err != nil {
+			return nil, err
+		}
+
+		n, err := file.Read(buff)
+		if err != nil {
+			return nil, err
+		}
+
+		if n > 0 {
+			content.Write(buff[:n])
+		}
+	}
+
+	return ioutil.NopCloser(&content), nil
 }
 
-// DeleteFile removes the file of an Item from the given directory.
-func (i Item) DeleteFile(directory string) error {
-	return os.Remove(i.targetFile(directory))
+// DeleteContent removes the content of an Item from the given directory.
+func (i Item) DeleteContent(directory string) error {
+	return os.RemoveAll(i.targetDirectory(directory))
 }
