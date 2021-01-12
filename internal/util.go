@@ -39,7 +39,7 @@ var (
 
 	durationPattern *regexp.Regexp = nil
 
-	ErrNoMatch = errors.New("Input does not match pattern")
+	ErrNoMatch = errors.New("input does not match pattern")
 )
 
 // getHtmlDurationPattern creates a regular expression pattern to match duration strings within the browser.
@@ -155,7 +155,7 @@ func ParseBytesize(s string) (size int64, err error) {
 	}
 
 	if size == 0 || unit == "" {
-		err = fmt.Errorf("Not all values were found, size := %d, unit := %s", size, unit)
+		err = fmt.Errorf("not all values were found, size := %d, unit := %s", size, unit)
 		return
 	}
 

@@ -18,7 +18,7 @@ func query(store *internal.Store) (items []internal.Item, err error) {
 		return queryIpAddr(ipAddress, store)
 	}
 
-	err = errors.New("No query was specified")
+	err = errors.New("no query was specified")
 	return
 }
 

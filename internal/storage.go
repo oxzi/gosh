@@ -21,7 +21,7 @@ const (
 
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
 // the requested ID.
-var ErrNotFound = errors.New("No Item found for this ID")
+var ErrNotFound = errors.New("no Item found for this ID")
 
 // Store stores an index of all Items as well as the pure files.
 type Store struct {

@@ -62,7 +62,7 @@ func checkStorePath(storep string) (err error) {
 
 	for _, dir := range dirs {
 		if _, stat := os.Stat(dir); os.IsNotExist(stat) {
-			err = fmt.Errorf("Required directory %s does not exist", dir)
+			err = fmt.Errorf("required directory %s does not exist", dir)
 			return
 		}
 	}
