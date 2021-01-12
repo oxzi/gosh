@@ -34,13 +34,13 @@ func NewMimeMap(file io.Reader) (mm MimeMap, err error) {
 
 		mmFields := strings.Fields(mmLine)
 		if l := len(mmFields); l != 2 {
-			err = fmt.Errorf("Entry in line %d has %d instead of 2 fields", i, l)
+			err = fmt.Errorf("entry in line %d has %d instead of 2 fields", i, l)
 			return
 		}
 
 		mmKey, mmVal := mmFields[0], mmFields[1]
 		if _, exists := mm[mmKey]; exists {
-			err = fmt.Errorf("Key \"%s\" from line %d was already defined", mmKey, i)
+			err = fmt.Errorf("key \"%s\" from line %d was already defined", mmKey, i)
 			return
 		} else {
 			mm[mmKey] = mmVal
