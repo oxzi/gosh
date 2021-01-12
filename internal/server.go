@@ -347,7 +347,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if f, err := serv.store.GetFile(item); err != nil {
+	if f, err := serv.store.GetFile(item, secretKey); err != nil {
 		log.WithError(err).WithField("ID", item.ID).Warn("Reading file errored")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
