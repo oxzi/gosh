@@ -8,6 +8,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/akamensky/base58"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -273,7 +275,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	itemId, err := serv.store.Put(item, f)
+	itemId, secretKey, err := serv.store.Put(item, f)
 	if err != nil {
 		log.WithError(err).Warn("Failed to store Item")
 
@@ -287,8 +289,13 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		"expires":  item.Expires,
 	}).Info("Uploaded new Item")
 
+	// encode the itemid and the secretkey into the returned URL
+	idBytes, _ := base58.Decode(itemId)
+	tokenBytes := append(idBytes, secretKey[:]...)
+	token := base58.Encode(tokenBytes)
+
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%s://%s/%s\n", WebProtocol(r), r.Host, itemId)
+	fmt.Fprintf(w, "%s://%s/%s\n", WebProtocol(r), r.Host, token)
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -299,9 +306,35 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqId := strings.TrimLeft(r.URL.Path, "/")
+	token := strings.TrimLeft(r.URL.Path, "/")
+	tokenBytes, err := base58.Decode(token)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"token": token,
+			"error": err,
+		}).Debug("Malformed token")
 
-	item, err := serv.store.Get(reqId, true)
+		http.Error(w, "Malformed request", http.StatusBadRequest)
+		return
+	}
+
+	if len(tokenBytes) != 36 {
+		log.WithFields(log.Fields{
+			"token":  token,
+			"length": len(tokenBytes),
+		}).Debug("Token size wrong")
+
+		http.Error(w, "Malformed request", http.StatusBadRequest)
+		return
+	}
+
+	// partition the token into the request ID (first 4 bytes) and the secret key (last 32 bytes)
+	reqId := base58.Encode(tokenBytes[:4])
+	key := tokenBytes[4:]
+	var secretKey [32]byte
+	copy(secretKey[:], key)
+
+	item, err := serv.store.GetDecrypted(reqId, secretKey, true)
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 

@@ -71,7 +71,9 @@ type Item struct {
 
 	BurnAfterReading bool
 
-	Filename    string
+	Filename      string
+	FilenameNonce [24]byte
+
 	ContentType string
 	Chunks      uint
 
