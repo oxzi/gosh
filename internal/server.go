@@ -309,7 +309,6 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	tokenBytes, err := base58.Decode(token)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"token": token,
 			"error": err,
 		}).Debug("Malformed token")
 
@@ -319,7 +318,6 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if len(tokenBytes) != 36 {
 		log.WithFields(log.Fields{
-			"token":  token,
 			"length": len(tokenBytes),
 		}).Debug("Token size wrong")
 
