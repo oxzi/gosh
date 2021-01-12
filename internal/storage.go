@@ -17,6 +17,7 @@ import (
 const (
 	DirDatabase = "db"
 	DirStorage  = "data"
+	ChunkSize   = 1048576
 )
 
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
@@ -179,15 +180,16 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 	i.ID = id
 	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
 
+	chunks, err := i.WriteFile(file, s.storageDir())
+	if err != nil {
+		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
+		return
+	}
+	i.Chunks = chunks
+
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {
 		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into database errored")
-		return
-	}
-
-	err = i.WriteFile(file, s.storageDir())
-	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
 		return
 	}
 
@@ -221,7 +223,7 @@ func (s *Store) Delete(i Item) (err error) {
 		return
 	}
 
-	err = i.DeleteFile(s.storageDir())
+	err = i.DeleteContent(s.storageDir())
 	if err != nil {
 		log.WithField("ID", i.ID).WithError(err).Warn("Deletion of Item from storage errored")
 		return
