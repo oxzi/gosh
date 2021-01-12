@@ -180,9 +180,7 @@ func (i Item) WriteFile(file io.ReadCloser, secretKey [32]byte, directory string
 	for {
 		n, err := file.Read(buff)
 		if err == io.EOF {
-			log.WithFields(log.Fields{
-				"chunks": chunkNumber,
-			}).Debug("Wrote chunked file")
+			log.WithField("chunks", chunkNumber).Debug("Wrote chunked file")
 			break
 		}
 		if err != nil {
