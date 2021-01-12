@@ -12,6 +12,7 @@ import (
 
 	"github.com/akamensky/base58"
 	"github.com/timshannon/badgerhold"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 const (
@@ -23,6 +24,11 @@ const (
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
 // the requested ID.
 var ErrNotFound = errors.New("no Item found for this ID")
+
+// ErrDecryptionError is returned by `Store.Get` if the decryption failed.
+// This may be because the wrong key has been provided,
+// or because the data has been tampered with.
+var ErrDecryptionError = errors.New("decryption error")
 
 // Store stores an index of all Items as well as the pure files.
 type Store struct {
@@ -113,7 +119,7 @@ func (s *Store) createID() (id string, err error) {
 			return
 		}
 
-		id = string(base58.Encode(idBuff))
+		id = base58.Encode(idBuff)
 
 		if bhErr := s.bh.Get(id, Item{}); bhErr == badgerhold.ErrNotFound {
 			return
@@ -136,7 +142,7 @@ func (s *Store) Close() error {
 	return s.bh.Close()
 }
 
-// Get an Item by its ID. The Item's file can be accessed with GetFile.
+// Get an Item by its ID. The Item's content can be accessed with GetFile.
 func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 	log.WithField("ID", id).Debug("Requested Item from Store")
 
@@ -146,7 +152,7 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 		err = ErrNotFound
 	} else if err != nil {
 		log.WithField("ID", id).WithError(err).Warn("Requested Item errored")
-	} else if err == nil && delExpired && i.Expires.Before(time.Now()) {
+	} else if delExpired && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
 			"expires": i.Expires,
@@ -162,13 +168,35 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 	return
 }
 
+// Get an Item by its ID and decrypt the filename. The Item's content can be accessed with GetFile.
+func (s *Store) GetDecrypted(id string, secretKey [32]byte, delExpired bool) (i Item, err error) {
+	i, err = s.Get(id, delExpired)
+	if err != nil {
+		return
+	}
+
+	filenameBytes, err := base58.Decode(i.Filename)
+	if err != nil {
+		return
+	}
+
+	decrypted, ok := secretbox.Open(nil, filenameBytes, &i.FilenameNonce, &secretKey)
+	if !ok {
+		err = ErrDecryptionError
+		return
+	}
+	i.Filename = string(decrypted)
+
+	return
+}
+
 // GetFile creates a ReadCloser to the Item's file.
 func (s *Store) GetFile(i Item) (io.ReadCloser, error) {
 	return i.ReadFile(s.storageDir())
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.
-func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
+func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, err error) {
 	log.Debug("Requested insertion of Item into the Store")
 
 	id, err = s.createID()
@@ -176,6 +204,21 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 		log.WithError(err).Warn("Creation of an ID for a new Item errored")
 		return
 	}
+
+	// generate a random key, which will be used to encrypt both the filename and the content
+	// the key will be appended to the generated URL and not saved anywhere
+	if _, err := io.ReadFull(rand.Reader, secretKey[:]); err != nil {
+		log.WithError(err).Warn("Error during key creation")
+	}
+
+	// encrypt the filename since that might be sensitive
+	var nonce [24]byte
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		log.WithError(err).Warn("Error during nonce creation")
+	}
+	filename := base58.Encode(secretbox.Seal(nil, []byte(i.Filename), &nonce, &secretKey))
+	i.Filename = filename
+	i.FilenameNonce = nonce
 
 	i.ID = id
 	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
@@ -213,7 +256,7 @@ func (s *Store) DeleteExpired() error {
 	return nil
 }
 
-// Delte an Item. Both the database entry and the file will be removed.
+// Delete an Item. Both the database entry and the file will be removed.
 func (s *Store) Delete(i Item) (err error) {
 	log.WithField("ID", i.ID).Debug("Requested deletion of Item")
 
