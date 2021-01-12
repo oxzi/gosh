@@ -2,8 +2,10 @@ package internal
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/nacl/secretbox"
 	"io"
 	"io/ioutil"
 	"net"
@@ -75,7 +77,9 @@ type Item struct {
 	FilenameNonce [24]byte
 
 	ContentType string
-	Chunks      uint
+
+	Chunks      uint64
+	ChunkNonces [][24]byte
 
 	Created time.Time
 	Expires time.Time `badgerholdIndex:"Expires"`
@@ -162,15 +166,16 @@ func (i Item) targetDirectory(directory string) string {
 
 // WriteFile serializes the file of an Item in the given directory. The file
 // name will be the ID of the Item.
-func (i Item) WriteFile(file io.ReadCloser, directory string) (uint, error) {
+func (i Item) WriteFile(file io.ReadCloser, secretKey [32]byte, directory string) (uint64, [][24]byte, error) {
 	chunkFolder := i.targetDirectory(directory)
 	err := os.Mkdir(chunkFolder, 0700)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	buff := make([]byte, ChunkSize)
-	var chunkNumber uint = 0
+	chunkNonces := make([][24]byte, 0)
+	var chunkNumber uint64 = 0
 
 	for {
 		n, err := file.Read(buff)
@@ -181,33 +186,43 @@ func (i Item) WriteFile(file io.ReadCloser, directory string) (uint, error) {
 			break
 		}
 		if err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 
 		if n > 0 {
 			filename := fmt.Sprintf("%v.chunk", chunkNumber)
 			f, err := os.Create(filepath.Join(chunkFolder, filename))
 			if err != nil {
-				return 0, err
+				return 0, nil, err
 			}
 
-			_, err = f.Write(buff[:n])
-			if err != nil {
-				return 0, err
+			var nonce [24]byte
+			if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+				return 0, nil, err
 			}
+
+			encrypted := secretbox.Seal(nil, buff[:n], &nonce, &secretKey)
+			chunkNonces = append(chunkNonces, nonce)
+
+			_, err = f.Write(encrypted)
+			if err != nil {
+				return 0, nil, err
+			}
+
 			chunkNumber += 1
 		}
 	}
 
-	return chunkNumber, file.Close()
+	return chunkNumber, chunkNonces, file.Close()
 }
 
 // ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
-func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
+func (i Item) ReadFile(directory string, secretKey [32]byte) (io.ReadCloser, error) {
 	var content bytes.Buffer
-	var chunkNumber uint = 0
+	var chunkNumber uint64 = 0
 	chunkFolder := i.targetDirectory(directory)
-	buff := make([]byte, ChunkSize)
+	// there is some overhead when encrypting, so the read buffer for the chunks must be a bit larger
+	buff := make([]byte, ChunkSize*2)
 
 	for ; chunkNumber < i.Chunks; chunkNumber++ {
 		filename := fmt.Sprintf("%v.chunk", chunkNumber)
@@ -222,7 +237,14 @@ func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
 		}
 
 		if n > 0 {
-			content.Write(buff[:n])
+			nonce := i.ChunkNonces[chunkNumber]
+
+			decrypted, ok := secretbox.Open(nil, buff[:n], &nonce, &secretKey)
+			if !ok {
+				return nil, ErrDecryptionError
+			}
+
+			content.Write(decrypted)
 		}
 	}
 

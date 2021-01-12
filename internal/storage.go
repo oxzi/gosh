@@ -191,8 +191,8 @@ func (s *Store) GetDecrypted(id string, secretKey [32]byte, delExpired bool) (i 
 }
 
 // GetFile creates a ReadCloser to the Item's file.
-func (s *Store) GetFile(i Item) (io.ReadCloser, error) {
-	return i.ReadFile(s.storageDir())
+func (s *Store) GetFile(i Item, secretKey [32]byte) (io.ReadCloser, error) {
+	return i.ReadFile(s.storageDir(), secretKey)
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.
@@ -223,12 +223,13 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, 
 	i.ID = id
 	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
 
-	chunks, err := i.WriteFile(file, s.storageDir())
+	chunks, nonces, err := i.WriteFile(file, secretKey, s.storageDir())
 	if err != nil {
 		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
 		return
 	}
 	i.Chunks = chunks
+	i.ChunkNonces = nonces
 
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {
