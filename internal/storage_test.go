@@ -40,7 +40,7 @@ func TestStore(t *testing.T) {
 	}
 	defer os.RemoveAll(storageDir)
 
-	store, err := NewStore(storageDir, false)
+	store, err := NewStore(storageDir, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	itemId, err := store.Put(item, itemData)
+	itemId, _, err := store.Put(item, itemData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestStore(t *testing.T) {
 	}
 
 	item.Expires = time.Now().Add(-1 * time.Minute).UTC()
-	if _, err := store.Put(item, itemData); err != nil {
+	if _, _, err := store.Put(item, itemData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,7 +92,7 @@ func TestStoreCreateId(t *testing.T) {
 	}
 	defer os.RemoveAll(storageDir)
 
-	store, err := NewStore(storageDir, false)
+	store, err := NewStore(storageDir, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}

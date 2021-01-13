@@ -168,13 +168,15 @@ type Server struct {
 	maxLifetime time.Duration
 	contactMail string
 	mimeMap     MimeMap
+	encrypt     bool
+	chunkSize   uint64
 }
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
 func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
-	contactMail string, mimeMap MimeMap) (s *Server, err error) {
-	store, storeErr := NewStore(storeDirectory, true)
+	contactMail string, mimeMap MimeMap, encrypt bool, chunkSize uint64) (s *Server, err error) {
+	store, storeErr := NewStore(storeDirectory, true, encrypt)
 	if storeErr != nil {
 		err = storeErr
 		return
@@ -186,6 +188,8 @@ func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
 		maxLifetime: maxLifetime,
 		contactMail: contactMail,
 		mimeMap:     mimeMap,
+		encrypt:     encrypt,
+		chunkSize:   chunkSize,
 	}
 	return
 }
@@ -252,7 +256,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	item, f, err := NewItem(r, serv.maxSize, serv.maxLifetime)
+	item, f, err := NewItem(r, serv.maxSize, serv.maxLifetime, serv.chunkSize)
 	if err == ErrLifetimeToLong {
 		log.Info("New Item with a too great lifetime was rejected")
 
@@ -284,14 +288,19 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.WithFields(log.Fields{
-		"ID":       itemId,
-		"expires":  item.Expires,
+		"ID":      itemId,
+		"expires": item.Expires,
 	}).Info("Uploaded new Item")
 
-	// encode the itemid and the secretkey into the returned URL
-	idBytes, _ := base58.Decode(itemId)
-	tokenBytes := append(idBytes, secretKey[:]...)
-	token := base58.Encode(tokenBytes)
+	var token string
+	if serv.encrypt {
+		// encode the itemid and the secretkey into the returned URL
+		idBytes, _ := base58.Decode(itemId)
+		tokenBytes := append(idBytes, secretKey[:]...)
+		token = base58.Encode(tokenBytes)
+	} else {
+		token = itemId
+	}
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "%s://%s/%s\n", WebProtocol(r), r.Host, token)
@@ -306,32 +315,44 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := strings.TrimLeft(r.URL.Path, "/")
-	tokenBytes, err := base58.Decode(token)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Debug("Malformed token")
-
-		http.Error(w, "Malformed request", http.StatusBadRequest)
-		return
-	}
-
-	if len(tokenBytes) != 36 {
-		log.WithFields(log.Fields{
-			"length": len(tokenBytes),
-		}).Debug("Token size wrong")
-
-		http.Error(w, "Malformed request", http.StatusBadRequest)
-		return
-	}
-
-	// partition the token into the request ID (first 4 bytes) and the secret key (last 32 bytes)
-	reqId := base58.Encode(tokenBytes[:4])
-	key := tokenBytes[4:]
+	var reqId string
 	var secretKey [32]byte
-	copy(secretKey[:], key)
+	if serv.encrypt {
+		tokenBytes, err := base58.Decode(token)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Debug("Malformed token")
 
-	item, err := serv.store.GetDecrypted(reqId, secretKey, true)
+			http.Error(w, "Malformed request", http.StatusBadRequest)
+			return
+		}
+
+		if len(tokenBytes) != 36 {
+			log.WithFields(log.Fields{
+				"length": len(tokenBytes),
+			}).Debug("Token size wrong")
+
+			http.Error(w, "Malformed request", http.StatusBadRequest)
+			return
+		}
+
+		// partition the token into the request ID (first 4 bytes) and the secret key (last 32 bytes)
+		reqId = base58.Encode(tokenBytes[:4])
+		key := tokenBytes[4:]
+		copy(secretKey[:], key)
+	} else {
+		reqId = token
+	}
+
+	var item Item
+	var err error
+	if serv.encrypt {
+		item, err = serv.store.GetDecrypted(reqId, secretKey, true)
+	} else {
+		item, err = serv.store.Get(reqId, true)
+	}
+
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
@@ -374,7 +395,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.WithFields(log.Fields{
-			"ID":       item.ID,
+			"ID": item.ID,
 		}).Info("Item was requested")
 	}
 

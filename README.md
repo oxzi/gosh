@@ -83,20 +83,26 @@ in `contrib/nixos/`.
 
 ```
 Usage of ./goshd:
+  -chunk-size string
+    	Size of chunks for large files (default "1MiB")
+  -config string
+    	Path to an optional config file
   -contact string
-        Contact E-Mail for abuses
+    	Contact E-Mail for abuses
+  -encrypt
+    	Encrypt stored data
   -listen string
-        Listen address for the HTTP server (default ":8080")
+    	Listen address for the HTTP server (default ":8080")
   -max-filesize string
-        Maximum file size in bytes (default "10MiB")
+    	Maximum file size in bytes (default "10MiB")
   -max-lifetime string
-        Maximum lifetime (default "24h")
+    	Maximum lifetime (default "24h")
   -mimemap string
-        MimeMap to substitute/drop MIMEs
+    	MimeMap to substitute/drop MIMEs
   -store string
-        Path to the store
+    	Path to the store
   -verbose
-        Verbose logging
+    	Verbose logging
 ```
 
 An example usage could look like this.

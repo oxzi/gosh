@@ -18,7 +18,6 @@ import (
 const (
 	DirDatabase = "db"
 	DirStorage  = "data"
-	ChunkSize   = 1048576
 )
 
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
@@ -33,6 +32,7 @@ var ErrDecryptionError = errors.New("decryption error")
 // Store stores an index of all Items as well as the pure files.
 type Store struct {
 	baseDir string
+	encrypt bool
 
 	bh *badgerhold.Store
 
@@ -43,10 +43,11 @@ type Store struct {
 
 // NewStore opens or initializes a Store in the given directory. A background
 // task for continuous cleaning can be activated.
-func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
+func NewStore(baseDir string, backgroundCleanup bool, encrypt bool) (s *Store, err error) {
 	s = &Store{
 		baseDir:    baseDir,
 		hasCleanup: backgroundCleanup,
+		encrypt:    encrypt,
 	}
 
 	log.WithField("directory", baseDir).Info("Opening Store")
@@ -192,7 +193,11 @@ func (s *Store) GetDecrypted(id string, secretKey [32]byte, delExpired bool) (i 
 
 // GetFile creates a ReadCloser to the Item's file.
 func (s *Store) GetFile(i Item, secretKey [32]byte) (io.ReadCloser, error) {
-	return i.ReadFile(s.storageDir(), secretKey)
+	if s.encrypt {
+		return i.ReadEncryptedFile(s.storageDir(), secretKey)
+	} else {
+		return i.ReadFile(s.storageDir())
+	}
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.
@@ -211,25 +216,37 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, 
 		log.WithError(err).Warn("Error during key creation")
 	}
 
-	// encrypt the filename since that might be sensitive
-	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		log.WithError(err).Warn("Error during nonce creation")
+	if s.encrypt {
+		// encrypt the filename since that might be sensitive
+		var nonce [24]byte
+		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+			log.WithError(err).Warn("Error during nonce creation")
+		}
+		filename := base58.Encode(secretbox.Seal(nil, []byte(i.Filename), &nonce, &secretKey))
+		i.Filename = filename
+		i.FilenameNonce = nonce
 	}
-	filename := base58.Encode(secretbox.Seal(nil, []byte(i.Filename), &nonce, &secretKey))
-	i.Filename = filename
-	i.FilenameNonce = nonce
 
 	i.ID = id
 	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
 
-	chunks, nonces, err := i.WriteFile(file, secretKey, s.storageDir())
-	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
-		return
+	if s.encrypt {
+		var chunks uint64
+		var nonces [][24]byte
+		chunks, nonces, err = i.WriteEncryptedFile(file, secretKey, s.storageDir())
+		if err != nil {
+			log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
+			return
+		}
+		i.Chunks = chunks
+		i.ChunkNonces = nonces
+	} else {
+		err = i.WriteFile(file, s.storageDir())
+		if err != nil {
+			log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
+			return
+		}
 	}
-	i.Chunks = chunks
-	i.ChunkNonces = nonces
 
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {

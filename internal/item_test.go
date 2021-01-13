@@ -134,7 +134,7 @@ func TestItem(t *testing.T) {
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.RemoteAddr = "[fe80::42]:2342"
 
-			i, f, err := NewItem(r, maxFilesize, time.Hour)
+			i, f, err := NewItem(r, maxFilesize, time.Hour, 0)
 			if (err == nil) != test.valid {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
