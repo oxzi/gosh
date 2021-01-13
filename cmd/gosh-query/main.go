@@ -90,7 +90,7 @@ func main() {
 		log.WithError(err).WithField("path", storep).Fatal("Failed to load store")
 	}
 
-	store, err := internal.NewStore(storep, false)
+	store, err := internal.NewStore(storep, false, false)
 	if err != nil {
 		log.WithError(err).WithField("path", storep).Fatal("Failed to start store")
 	}

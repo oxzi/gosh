@@ -21,6 +21,8 @@ var (
 	mimeMap     internal.MimeMap
 	listenAddr  string
 	verbose     bool
+	encrypt     bool
+	chunkSize   uint64
 )
 
 func init() {
@@ -30,6 +32,7 @@ func init() {
 		maxLifetimeStr string
 		maxFilesizeStr string
 		mimeMapStr     string
+		chunkSizeStr   string
 	)
 
 	flag.StringVar(&storePath, "store", "", "Path to the store")
@@ -38,7 +41,9 @@ func init() {
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
 	flag.StringVar(&mimeMapStr, "mimemap", "", "MimeMap to substitute/drop MIMEs")
 	flag.StringVar(&listenAddr, "listen", ":8080", "Listen address for the HTTP server")
+	flag.StringVar(&chunkSizeStr, "chunk-size", "1MiB", "Size of chunks for large files. Only relevant if encryption is switched on")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	flag.BoolVar(&encrypt, "encrypt", false, "Encrypt stored data")
 
 	flag.Parse()
 
@@ -56,6 +61,12 @@ func init() {
 		log.WithError(err).Fatal("Failed to parse byte size")
 	} else {
 		maxFilesize = bs
+	}
+
+	if cs, err := internal.ParseBytesize(chunkSizeStr); err != nil {
+		log.WithError(err).Fatal("Failed to parse byte size")
+	} else {
+		chunkSize = uint64(cs)
 	}
 
 	if mimeMapStr == "" {
@@ -107,7 +118,7 @@ func webserver(server *internal.Server) {
 
 func main() {
 	server, err := internal.NewServer(
-		storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
+		storePath, maxFilesize, maxLifetime, contactMail, mimeMap, encrypt, chunkSize)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}

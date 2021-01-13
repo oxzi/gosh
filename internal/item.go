@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/nacl/secretbox"
 	"io"
 	"io/ioutil"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"golang.org/x/crypto/nacl/secretbox"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -79,6 +80,7 @@ type Item struct {
 	ContentType string
 
 	Chunks      uint64
+	ChunkSize   uint64
 	ChunkNonces [][24]byte
 
 	Created time.Time
@@ -98,7 +100,7 @@ var (
 // NewItem creates a new Item based on a Request. The ID will be left empty.
 // Furthermore, if no error has occurred, a file is returned from which the
 // file content should be read. This file must be closed afterwards.
-func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item Item, file io.ReadCloser, err error) {
+func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration, chunkSize uint64) (item Item, file io.ReadCloser, err error) {
 	err = r.ParseMultipartForm(maxSize)
 	if err != nil {
 		return
@@ -156,24 +158,48 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 		return
 	}
 
+	item.ChunkSize = chunkSize
+
 	return
 }
 
-// targetDirectory returns the path to the Item's file.
-func (i Item) targetDirectory(directory string) string {
+// target returns the path to the Item's file/folder/whatever.
+func (i Item) target(directory string) string {
 	return filepath.Join(directory, i.ID)
 }
 
 // WriteFile serializes the file of an Item in the given directory. The file
 // name will be the ID of the Item.
-func (i Item) WriteFile(file io.ReadCloser, secretKey [32]byte, directory string) (uint64, [][24]byte, error) {
-	chunkFolder := i.targetDirectory(directory)
+func (i Item) WriteFile(file io.ReadCloser, directory string) error {
+	f, err := os.Create(i.target(directory))
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	if _, err := io.Copy(f, file); err != nil {
+		return err
+	}
+
+	return file.Close()
+}
+
+// ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
+func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
+	return os.Open(i.target(directory))
+}
+
+// WriteEncryptedFile splits the file into chunks of size ChunkSize and encrypts each chunk using nacl secretbox.
+// Files will be put into a folder named with the Item ID
+func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [32]byte, directory string) (uint64, [][24]byte, error) {
+	chunkFolder := i.target(directory)
 	err := os.Mkdir(chunkFolder, 0700)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	buff := make([]byte, ChunkSize)
+	buff := make([]byte, i.ChunkSize)
 	chunkNonces := make([][24]byte, 0)
 	var chunkNumber uint64 = 0
 
@@ -214,13 +240,14 @@ func (i Item) WriteFile(file io.ReadCloser, secretKey [32]byte, directory string
 	return chunkNumber, chunkNonces, file.Close()
 }
 
-// ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
-func (i Item) ReadFile(directory string, secretKey [32]byte) (io.ReadCloser, error) {
+// ReadEncryptedFile takes the chunks written by WriteEncryptedFile, decrypts and verifies each chunk
+// and reassembles the original file in memory (the decrypted contents are never written to disk).
+func (i Item) ReadEncryptedFile(directory string, secretKey [32]byte) (io.ReadCloser, error) {
 	var content bytes.Buffer
 	var chunkNumber uint64 = 0
-	chunkFolder := i.targetDirectory(directory)
+	chunkFolder := i.target(directory)
 	// there is some overhead when encrypting, so the read buffer for the chunks must be a bit larger
-	buff := make([]byte, ChunkSize*2)
+	buff := make([]byte, i.ChunkSize*2)
 
 	for ; chunkNumber < i.Chunks; chunkNumber++ {
 		filename := fmt.Sprintf("%v.chunk", chunkNumber)
@@ -251,5 +278,5 @@ func (i Item) ReadFile(directory string, secretKey [32]byte) (io.ReadCloser, err
 
 // DeleteContent removes the content of an Item from the given directory.
 func (i Item) DeleteContent(directory string) error {
-	return os.RemoveAll(i.targetDirectory(directory))
+	return os.RemoveAll(i.target(directory))
 }
