@@ -72,23 +72,47 @@ func TestOwnerType(t *testing.T) {
 func TestItem(t *testing.T) {
 	const maxFilesize = 1024
 
+	var secretKey [32]byte
+	rand.Read(secretKey[:])
+
 	tests := []struct {
 		size             int64
 		filename         string
 		burnAfterReading bool
 		lifetime         string
 
-		valid bool
+		valid     bool
+		encrypt   bool
+		chunkSize uint64
 	}{
-		{0, "", false, "", false},
-		{1, "test.jpg", false, "", true},
-		{1, "test.jpg", true, "", true},
-		{1, "test.jpg", false, "1m", true},
-		{1024, "test.jpg", false, "", true},
-		{1024, "test.jpg", true, "", true},
-		{1024, "test.jpg", true, "23s", true},
-		{1024, "", false, "", false},
-		{1025, "", false, "", false},
+		{0, "", false, "", false, false, 1024},
+		{0, "", false, "", false, true, 1024},
+		{1, "test.jpg", false, "", true, false, 1024},
+		{1, "test.jpg", false, "", true, true, 1024},
+		{1, "test.jpg", true, "", true, false, 1024},
+		{1, "test.jpg", true, "", true, true, 1024},
+		{1, "test.jpg", false, "1m", true, false, 1024},
+		{1, "test.jpg", false, "1m", true, true, 1024},
+		{1024, "test.jpg", false, "", true, false, 1024},
+		{1024, "test.jpg", false, "", true, false, 128},
+		{1024, "test.jpg", false, "", true, true, 1024},
+		{1024, "test.jpg", false, "", true, true, 128},
+		{1024, "test.jpg", true, "", true, false, 1024},
+		{1024, "test.jpg", true, "", true, false, 128},
+		{1024, "test.jpg", true, "", true, true, 1024},
+		{1024, "test.jpg", true, "", true, true, 128},
+		{1024, "test.jpg", true, "23s", true, false, 1024},
+		{1024, "test.jpg", true, "23s", true, false, 128},
+		{1024, "test.jpg", true, "23s", true, true, 1024},
+		{1024, "test.jpg", true, "23s", true, true, 128},
+		{1024, "", false, "", false, false, 1024},
+		{1024, "", false, "", false, false, 128},
+		{1024, "", false, "", false, true, 1024},
+		{1024, "", false, "", false, true, 128},
+		{1025, "", false, "", false, false, 1025},
+		{1025, "", false, "", false, false, 128},
+		{1025, "", false, "", false, true, 1025},
+		{1025, "", false, "", false, true, 128},
 	}
 
 	for _, test := range tests {
@@ -98,6 +122,9 @@ func TestItem(t *testing.T) {
 		tmpFileData := make([]byte, test.size)
 		rand.Seed(0)
 		rand.Read(tmpFileData)
+
+		var chunks uint64
+		var chunkNonces [][24]byte
 
 		if f, err := writer.CreateFormFile(formFile, test.filename); err != nil {
 			t.Fatal(err)
@@ -134,7 +161,7 @@ func TestItem(t *testing.T) {
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.RemoteAddr = "[fe80::42]:2342"
 
-			i, f, err := NewItem(r, maxFilesize, time.Hour, 0)
+			i, f, err := NewItem(r, maxFilesize, time.Hour, test.chunkSize)
 			if (err == nil) != test.valid {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
@@ -168,17 +195,37 @@ func TestItem(t *testing.T) {
 			if itemDir, err := ioutil.TempDir("", ""); err != nil {
 				t.Fatal(err)
 			} else {
-				if err := i.WriteFile(f, itemDir); err != nil {
-					t.Fatal(err)
+				if test.encrypt {
+					if chunks, chunkNonces, err = i.WriteEncryptedFile(f, secretKey, itemDir); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := i.WriteFile(f, itemDir); err != nil {
+						t.Fatal(err)
+					}
 				}
 
-				if file, err := i.ReadFile(itemDir); err != nil {
-					t.Fatal(err)
-				} else if data, err := ioutil.ReadAll(file); err != nil {
-					t.Fatal(err)
-				} else if !reflect.DeepEqual(tmpFileData, data) {
-					t.Fatalf("Data mismatches; got something of length %d and expected %d",
-						len(data), len(tmpFileData))
+				i.Chunks = chunks
+				i.ChunkNonces = chunkNonces
+
+				if test.encrypt {
+					if file, err := i.ReadEncryptedFile(itemDir, secretKey); err != nil {
+						t.Fatal(err)
+					} else if data, err := ioutil.ReadAll(file); err != nil {
+						t.Fatal(err)
+					} else if !reflect.DeepEqual(tmpFileData, data) {
+						t.Fatalf("Data mismatches; got something of length %d and expected %d",
+							len(data), len(tmpFileData))
+					}
+				} else {
+					if file, err := i.ReadFile(itemDir); err != nil {
+						t.Fatal(err)
+					} else if data, err := ioutil.ReadAll(file); err != nil {
+						t.Fatal(err)
+					} else if !reflect.DeepEqual(tmpFileData, data) {
+						t.Fatalf("Data mismatches; got something of length %d and expected %d",
+							len(data), len(tmpFileData))
+					}
 				}
 
 				os.RemoveAll(itemDir)
