@@ -72,7 +72,7 @@ func TestOwnerType(t *testing.T) {
 func TestItem(t *testing.T) {
 	const maxFilesize = 1024
 
-	var secretKey [32]byte
+	var secretKey [KeySize]byte
 	rand.Read(secretKey[:])
 
 	tests := []struct {
@@ -124,7 +124,7 @@ func TestItem(t *testing.T) {
 		rand.Read(tmpFileData)
 
 		var chunks uint64
-		var chunkNonces [][24]byte
+		var chunkNonces [][NonceSize]byte
 
 		if f, err := writer.CreateFormFile(formFile, test.filename); err != nil {
 			t.Fatal(err)

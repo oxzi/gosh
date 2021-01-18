@@ -20,6 +20,12 @@ const (
 	DirStorage  = "data"
 )
 
+const (
+	IDSize    = 4
+	KeySize   = 32
+	NonceSize = 24
+)
+
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
 // the requested ID.
 var ErrNotFound = errors.New("no Item found for this ID")
@@ -170,7 +176,7 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 }
 
 // Get an Item by its ID and decrypt the filename. The Item's content can be accessed with GetFile.
-func (s *Store) GetDecrypted(id string, secretKey [32]byte, delExpired bool) (i Item, err error) {
+func (s *Store) GetDecrypted(id string, secretKey [KeySize]byte, delExpired bool) (i Item, err error) {
 	i, err = s.Get(id, delExpired)
 	if err != nil {
 		return
@@ -192,7 +198,7 @@ func (s *Store) GetDecrypted(id string, secretKey [32]byte, delExpired bool) (i 
 }
 
 // GetFile creates a ReadCloser to the Item's file.
-func (s *Store) GetFile(i Item, secretKey [32]byte) (io.ReadCloser, error) {
+func (s *Store) GetFile(i Item, secretKey [KeySize]byte) (io.ReadCloser, error) {
 	if s.encrypt {
 		return i.ReadEncryptedFile(s.storageDir(), secretKey)
 	} else {
@@ -201,7 +207,7 @@ func (s *Store) GetFile(i Item, secretKey [32]byte) (io.ReadCloser, error) {
 }
 
 // Put a new Item inside the Store. Both a database entry and a file will be created.
-func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, err error) {
+func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [KeySize]byte, err error) {
 	log.Debug("Requested insertion of Item into the Store")
 
 	id, err = s.createID()
@@ -219,7 +225,7 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, 
 		}
 
 		// encrypt the filename since that might be sensitive
-		var nonce [24]byte
+		var nonce [NonceSize]byte
 		if _, err = io.ReadFull(rand.Reader, nonce[:]); err != nil {
 			log.WithError(err).Warn("Error during nonce creation")
 			return
@@ -234,7 +240,7 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, 
 
 	if s.encrypt {
 		var chunks uint64
-		var nonces [][24]byte
+		var nonces [][NonceSize]byte
 		chunks, nonces, err = i.WriteEncryptedFile(file, secretKey, s.storageDir())
 		if err != nil {
 			log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")

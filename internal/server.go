@@ -316,7 +316,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	token := strings.TrimLeft(r.URL.Path, "/")
 	var reqId string
-	var secretKey [32]byte
+	var secretKey [KeySize]byte
 	if serv.encrypt {
 		tokenBytes, err := base58.Decode(token)
 		if err != nil {
@@ -328,7 +328,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(tokenBytes) != 36 {
+		if len(tokenBytes) != (IDSize + KeySize) {
 			log.WithFields(log.Fields{
 				"length": len(tokenBytes),
 			}).Debug("Token size wrong")

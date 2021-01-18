@@ -75,13 +75,13 @@ type Item struct {
 	BurnAfterReading bool
 
 	Filename      string
-	FilenameNonce [24]byte
+	FilenameNonce [NonceSize]byte
 
 	ContentType string
 
 	Chunks      uint64
 	ChunkSize   uint64
-	ChunkNonces [][24]byte
+	ChunkNonces [][NonceSize]byte
 
 	Created time.Time
 	Expires time.Time `badgerholdIndex:"Expires"`
@@ -192,7 +192,7 @@ func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
 
 // WriteEncryptedFile splits the file into chunks of size ChunkSize and encrypts each chunk using nacl secretbox.
 // Files will be put into a folder named with the Item ID
-func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [32]byte, directory string) (uint64, [][24]byte, error) {
+func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [KeySize]byte, directory string) (uint64, [][NonceSize]byte, error) {
 	chunkFolder := i.target(directory)
 	err := os.Mkdir(chunkFolder, 0700)
 	if err != nil {
@@ -200,7 +200,7 @@ func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [32]byte, directo
 	}
 
 	buff := make([]byte, i.ChunkSize)
-	chunkNonces := make([][24]byte, 0)
+	chunkNonces := make([][NonceSize]byte, 0)
 	var chunkNumber uint64 = 0
 
 	for {
@@ -220,7 +220,7 @@ func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [32]byte, directo
 				return 0, nil, err
 			}
 
-			var nonce [24]byte
+			var nonce [NonceSize]byte
 			if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 				return 0, nil, err
 			}
@@ -242,7 +242,7 @@ func (i Item) WriteEncryptedFile(file io.ReadCloser, secretKey [32]byte, directo
 
 // ReadEncryptedFile takes the chunks written by WriteEncryptedFile, decrypts and verifies each chunk
 // and reassembles the original file in memory (the decrypted contents are never written to disk).
-func (i Item) ReadEncryptedFile(directory string, secretKey [32]byte) (io.ReadCloser, error) {
+func (i Item) ReadEncryptedFile(directory string, secretKey [KeySize]byte) (io.ReadCloser, error) {
 	var content bytes.Buffer
 	var chunkNumber uint64 = 0
 	chunkFolder := i.target(directory)
