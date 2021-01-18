@@ -206,21 +206,23 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, secretKey [32]byte, 
 
 	id, err = s.createID()
 	if err != nil {
-		log.WithError(err).Warn("Creation of an ID for a new Item errored")
+		log.WithError(err).Error("Creation of an ID for a new Item errored")
 		return
 	}
 
-	// generate a random key, which will be used to encrypt both the filename and the content
-	// the key will be appended to the generated URL and not saved anywhere
-	if _, err := io.ReadFull(rand.Reader, secretKey[:]); err != nil {
-		log.WithError(err).Warn("Error during key creation")
-	}
-
 	if s.encrypt {
+		// generate a random key, which will be used to encrypt both the filename and the content
+		// the key will be appended to the generated URL and not saved anywhere
+		if _, err = io.ReadFull(rand.Reader, secretKey[:]); err != nil {
+			log.WithError(err).Warn("Error during key creation")
+			return
+		}
+
 		// encrypt the filename since that might be sensitive
 		var nonce [24]byte
-		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		if _, err = io.ReadFull(rand.Reader, nonce[:]); err != nil {
 			log.WithError(err).Warn("Error during nonce creation")
+			return
 		}
 		filename := base58.Encode(secretbox.Seal(nil, []byte(i.Filename), &nonce, &secretKey))
 		i.Filename = filename
