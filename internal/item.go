@@ -249,7 +249,7 @@ func (i Item) ReadEncryptedFile(directory string, secretKey [KeySize]byte) (io.R
 	// there is some overhead when encrypting, so the read buffer for the chunks must be a bit larger
 	buff := make([]byte, i.ChunkSize*2)
 
-	for ; chunkNumber < i.Chunks; chunkNumber++ {
+	for chunkNumber < i.Chunks {
 		filename := fmt.Sprintf("%v.chunk", chunkNumber)
 		file, err := os.Open(filepath.Join(chunkFolder, filename))
 		if err != nil {
@@ -270,6 +270,8 @@ func (i Item) ReadEncryptedFile(directory string, secretKey [KeySize]byte) (io.R
 			}
 
 			content.Write(decrypted)
+
+			chunkNumber++
 		}
 	}
 
