@@ -1,0 +1,9 @@
+store = "/srv/gosh"
+maxfilesize = "1GiB"
+maxlifetime = "2w"
+contact = "foobar@example.org"
+mimemap = ""
+listen = ":8080"
+verbose = false
+encrypt = false
+chunksize = "1MiB"

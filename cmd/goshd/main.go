@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
-	"flag"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	flag "github.com/spf13/pflag"
 
 	"github.com/oxzi/gosh/internal"
+	"github.com/spf13/viper"
 )
 
 var (
+	configPath  string
 	storePath   string
 	maxFilesize int64
 	maxLifetime time.Duration
@@ -35,6 +37,7 @@ func init() {
 		chunkSizeStr   string
 	)
 
+	flag.StringVar(&configPath, "config", "", "Path to an alternative config file")
 	flag.StringVar(&storePath, "store", "", "Path to the store")
 	flag.StringVar(&maxFilesizeStr, "max-filesize", "10MiB", "Maximum file size in bytes")
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
@@ -44,35 +47,69 @@ func init() {
 	flag.StringVar(&chunkSizeStr, "chunk-size", "1MiB", "Size of chunks for large files. Only relevant if encryption is switched on")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	flag.BoolVar(&encrypt, "encrypt", false, "Encrypt stored data")
-
 	flag.Parse()
 
-	if verbose {
+	err := viper.BindPFlags(flag.CommandLine)
+	if err != nil {
+		log.WithError(err).Fatal("")
+	}
+
+	viper.SetDefault("max-filesize", "10MiB")
+	viper.SetDefault("max-lifetime", "24h")
+	viper.SetDefault("listen", ":8080")
+	viper.SetDefault("chunk-size", "1MiB")
+	viper.SetDefault("verbose", false)
+	viper.SetDefault("encrypt", false)
+
+	viper.SetConfigName("goshd")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath("/etc/")
+	viper.AddConfigPath(".")
+
+	if viper.GetString("config") != "" {
+		viper.SetConfigFile(viper.GetString("config"))
+	}
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			log.WithError(err).Fatal("Error reading config file.")
+		}
+	}
+
+	if viper.GetBool("verbose") {
 		log.SetLevel(log.DebugLevel)
+		viper.Debug()
 	}
 
-	if lt, err := internal.ParseDuration(maxLifetimeStr); err != nil {
-		log.WithError(err).Fatal("Failed to parse lifetime")
+	if viper.GetString("store") == "" {
+		log.Fatal("Store Path must be set, see `--help`")
 	} else {
-		maxLifetime = lt
+		storePath = viper.GetString("store")
 	}
 
-	if bs, err := internal.ParseBytesize(maxFilesizeStr); err != nil {
+	if bs, err := internal.ParseBytesize(viper.GetString("max-filesize")); err != nil {
 		log.WithError(err).Fatal("Failed to parse byte size")
 	} else {
 		maxFilesize = bs
 	}
 
-	if cs, err := internal.ParseBytesize(chunkSizeStr); err != nil {
-		log.WithError(err).Fatal("Failed to parse byte size")
+	if lt, err := internal.ParseDuration(viper.GetString("max-lifetime")); err != nil {
+		log.WithError(err).Fatal("Failed to parse lifetime")
 	} else {
-		chunkSize = uint64(cs)
+		maxLifetime = lt
 	}
 
-	if mimeMapStr == "" {
+	if viper.GetString("contact") == "" {
+		log.Fatal("Contact information must be set, see `--help`")
+	} else {
+		contactMail = viper.GetString("contact")
+	}
+
+	if viper.GetString("mimemap") == "" {
 		mimeMap = make(internal.MimeMap)
 	} else {
-		if f, err := os.Open(mimeMapStr); err != nil {
+		if f, err := os.Open(viper.GetString("mimemap")); err != nil {
 			log.WithError(err).Fatal("Failed to open MimeMap")
 		} else if mm, err := internal.NewMimeMap(f); err != nil {
 			log.WithError(err).Fatal("Failed to parse MimeMap")
@@ -82,10 +119,14 @@ func init() {
 		}
 	}
 
-	if storePath == "" {
-		log.Fatal("Store Path must be set, see `--help`")
-	} else if contactMail == "" {
-		log.Fatal("Contact information must be set, see `--help`")
+	listenAddr = viper.GetString("listen")
+
+	encrypt = viper.GetBool("encrypt")
+
+	if cs, err := internal.ParseBytesize(viper.GetString("chunk-size")); err != nil {
+		log.WithError(err).Fatal("Failed to parse byte size")
+	} else {
+		chunkSize = uint64(cs)
 	}
 }
 
