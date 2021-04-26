@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.11', '1.15' ]
+        go: [ '1.11', '1.16' ]
 
     steps:
     - name: Set up Go ${{ matrix.go }}
@@ -40,4 +40,4 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v2
       with:
-        version: v1.35.2
+        version: v1.39.0

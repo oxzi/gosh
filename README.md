@@ -1,7 +1,7 @@
 # gosh! Go Share ![CI](https://github.com/oxzi/gosh/workflows/CI/badge.svg)
 
-gosh is a simple HTTP file server on which users can upload their files without
-login or authentication. All files have a maximum lifetime and are then deleted.
+gosh is a simple HTTP file server on which users can upload their files without login or authentication.
+All files have a maximum lifetime and are then deleted.
 
 
 ## Features
@@ -33,8 +33,7 @@ go build ./cmd/gosh-query
 
 ### NixOS Module
 
-On a NixOS system one can configure gosh as a module. Have look at the example
-in `contrib/nixos/`.
+On a NixOS system one can configure gosh as a module. Have look at the example in `contrib/nixos/`.
 
 ```nix
 # Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
@@ -110,8 +109,7 @@ An example usage could look like this.
   -store /path/to/my/store/dir
 ```
 
-The *MimeMap* file contains both substitutions or *drops* in each line and
-could look as follows.
+The *MimeMap* file contains both substitutions or *drops* in each line and could look as follows.
 
 ```
 # Replace text/html with text/plain
@@ -124,8 +122,7 @@ image/png DROP
 
 ### gosh-query
 
-The store can also be queried offline to get information or delete items. This
-is `gosh-query`'s job.
+The store can also be queried offline to get information or delete items. This is `gosh-query`'s job.
 
 ```
 Usage of ./gosh-query:
@@ -174,12 +171,14 @@ curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
 
 ### Fish, `contrib/fish/`
 
-A `fish`-funtion allow to easily upload a file to the server of your choice
-which needs to manually edited. With the `-b` or `--burn` flags you may decide
-to burn the file after reading.
+A `fish`-funtion allow to easily upload a file to the server of your choice which needs to manually edited.
+With the `-b` or `--burn` flags you may decide to burn the file after reading.
 
 
 ## Related Work
+
+A fork which enables server-side file encryption is available in the `server-crypto` branch, thanks to @CryptoCopter.
+For the sake of simplicity and because I don't like to trust a server, this has been removed from the `master` branch.
 
 Of course, there are already similar projects, for example:
 
