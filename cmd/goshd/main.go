@@ -76,6 +76,8 @@ func init() {
 	} else if contactMail == "" {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
+
+	hardening()
 }
 
 func webserver(server *internal.Server) {

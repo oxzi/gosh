@@ -1,5 +1,5 @@
-goshd
-gosh-query
+./goshd
+./gosh-query
 
 # Created by https://www.gitignore.io/api/go
 # Edit at https://www.gitignore.io/?templates=go
