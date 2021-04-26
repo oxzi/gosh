@@ -3,6 +3,7 @@ module github.com/oxzi/gosh
 go 1.15
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/akamensky/base58 v0.0.0-20170920141933-92b0f56f531a
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect

@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/oxzi/gosh/internal"
 )
 
@@ -83,7 +84,7 @@ func init() {
 func webserver(server *internal.Server) {
 	webServer := &http.Server{
 		Addr:    listenAddr,
-		Handler: server,
+		Handler: gziphandler.GzipHandler(server),
 	}
 
 	go func() {
