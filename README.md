@@ -12,10 +12,11 @@ All files have a maximum lifetime and are then deleted.
 - File and all metadata are automatically deleted after expiration
 - Configurable maximum lifetime and file size for uploads
 - Replace or drop configured MIME types
-- Simple upload via `curl`, `wget` or the like
+- Simple upload both via webpanel or by `curl`, `wget` or the like
 - User manual available from the `/` page
 - Uploads can specify their own shorter lifetime
 - Burn after Reading: uploads can be deleted after the first download
+- Daemon has seccomp BPF protection, at least for x86_64
 
 
 ## Installation
@@ -67,7 +68,12 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
         enableACME = true;
         forceSSL = true;
 
-        locations."/".proxyPass = "http://127.0.0.1:30100/";
+        locations."/" = {
+          proxyPass = "http://127.0.0.1:30100/";
+          extraConfig = ''
+            proxy_set_header Accept-Encoding "gzip";
+          '';
+        };
       };
     };
   };
