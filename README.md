@@ -1,12 +1,12 @@
 # gosh! Go Share ![CI](https://github.com/oxzi/gosh/workflows/CI/badge.svg)
 
-gosh is a simple HTTP file server on which users can upload their files without login or authentication.
+gosh is a simple HTTP file sharing server on which users can upload their files without login or authentication.
 All files have a maximum lifetime and are then deleted.
 
 
 ## Features
 
-- Standalone HTTP web server, no additional server needed
+- Standalone HTTP web server, no additional server needed (might be proxied for HTTPS)
 - Store with both files and some metadata
 - Only safe uploader's IP address for legal reasons, anonymous download
 - File and all metadata are automatically deleted after expiration
@@ -15,14 +15,15 @@ All files have a maximum lifetime and are then deleted.
 - Simple upload both via webpanel or by `curl`, `wget` or the like
 - User manual available from the `/` page
 - Uploads can specify their own shorter lifetime
+- Each upload generates also generates a custom deletion URL
 - Burn after Reading: uploads can be deleted after the first download
-- Daemon has seccomp BPF protection, at least for x86_64
+- On Linux, there is seccomp-bpf protection
 
 
 ## Installation
 ### Generic Installation
 
-The system needs to have Go installed in version 1.11 or later.
+The system needs to have Go installed in version 1.13 or later.
 
 ```bash
 git clone https://github.com/oxzi/gosh.git
@@ -60,20 +61,16 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
     nginx = {
       enable = true;
 
+      recommendedGzipSettings = true;
+      recommendedOptimisation = true;
       recommendedTlsSettings = true;
-      # This one is important.
       recommendedProxySettings = true;
 
       virtualHosts."gosh.example.com" = {
         enableACME = true;
         forceSSL = true;
 
-        locations."/" = {
-          proxyPass = "http://127.0.0.1:30100/";
-          extraConfig = ''
-            proxy_set_header Accept-Encoding "gzip";
-          '';
-        };
+        locations."/".proxyPass = "http://${config.services.gosh.listenAddress}/";
       };
     };
   };
@@ -183,8 +180,9 @@ With the `-b` or `--burn` flags you may decide to burn the file after reading.
 
 ## Related Work
 
-A fork which enables server-side file encryption is available in the `server-crypto` branch, thanks to @CryptoCopter.
-For the sake of simplicity and because I don't like to trust a server, this has been removed from the `master` branch.
+There is also [darn](https://github.com/CryptoCopter/darn), a gosh fork which enables server-side file encryption.
+Back in time, this code was merged into gosh.
+However, for the sake of simplicity and because I don't like to trust a server, this has been removed again.
 
 Of course, there are already similar projects, for example:
 
