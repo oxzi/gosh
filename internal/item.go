@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/akamensky/base58"
 )
 
 const (
@@ -65,6 +68,8 @@ func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 type Item struct {
 	ID string `badgerhold:"key"`
 
+	DeletionKey string
+
 	BurnAfterReading bool
 
 	Filename    string
@@ -111,6 +116,13 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	} else if fileHeader.Size <= 0 {
 		err = fmt.Errorf("File size is zero")
 		return
+	}
+
+	delKeyBuff := make([]byte, 24)
+	if _, err = rand.Read(delKeyBuff); err != nil {
+		return
+	} else {
+		item.DeletionKey = string(base58.Encode(delKeyBuff))
 	}
 
 	if burnAfterReading := r.FormValue(formBurnAfterReading); burnAfterReading == "1" {

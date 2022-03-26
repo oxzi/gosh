@@ -75,6 +75,7 @@ func checkStorePath(storep string) (err error) {
 func prettyPrintItem(item internal.Item) {
 	log.Infof("### Item: %s", item.ID)
 	log.Infof(" - Filename: %q (%s)", item.Filename, item.ContentType)
+	log.Infof(" - Deletion Key: %s", item.DeletionKey)
 	log.Infof(" - Burn After Reading: %t", item.BurnAfterReading)
 	log.Infof(" - Created: %v", item.Created)
 	log.Infof(" - Expires: %v", item.Expires)

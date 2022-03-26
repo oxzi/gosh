@@ -82,7 +82,9 @@ const indexTpl = `<!DOCTYPE html>
 		<p>
 			Your file will expire after {{.Expires}} or earlier, if explicitly
 			specified. Optionally, the file can be deleted directly after the first
-			retrieval. In addition, the maximum file size is {{.Size}}.
+			retrieval. For each upload, a deletion URL will also be generated which
+			can be used to delete the file before expiration. In addition, the
+			maximum file size is {{.Size}}.
 		</p>
 		<p>
 			This is no place to share questionable or illegal data. Please use another
@@ -138,8 +140,7 @@ const indexTpl = `<!DOCTYPE html>
 		<h2>## Privacy</h2>
 
 		This software stores the IP address for each upload. This information is
-		stored as long as the file is available. In addition, the IP address of the
-		user might be logged in case of an error. A normal download is logged without
+		stored as long as the file is available. A normal download is logged without
 		user information.
 
 		<h2>## Abuse</h2>
@@ -153,6 +154,8 @@ const indexTpl = `<!DOCTYPE html>
 `
 
 const (
+	msgDeletionKeyWrong  = "Error: Deletion key is incorrect."
+	msgDeletionSuccess   = "OK: Item was deleted."
 	msgFileSizeExceeds   = "Error: File size exceeds maximum."
 	msgGenericError      = "Error: Something went wrong."
 	msgIllegalMime       = "Error: MIME type is blacklisted."
@@ -196,8 +199,11 @@ func (serv *Server) Close() error {
 }
 
 func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if reqPath := r.URL.Path; reqPath == "/" {
+	reqPath := r.URL.Path
+	if reqPath == "/" {
 		serv.handleRoot(w, r)
+	} else if strings.HasPrefix(reqPath, "/del/") {
+		serv.handleDeletion(w, r)
 	} else {
 		serv.handleRequest(w, r)
 	}
@@ -289,7 +295,13 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}).Info("Uploaded new Item")
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%s://%s/%s\n", WebProtocol(r), r.Host, itemId)
+
+	baseUrl := fmt.Sprintf("%s://%s", WebProtocol(r), r.Host)
+	fmt.Fprintf(w, "Fetch:   %s/%s\n", baseUrl, itemId)
+	fmt.Fprintf(w, "Delete:  %s/del/%s/%s\n", baseUrl, itemId, item.DeletionKey)
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Expires: %v\n", item.Expires)
+	fmt.Fprintf(w, "Burn:    %t\n", item.BurnAfterReading)
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +370,57 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 		}
 	}
+}
+
+func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		log.WithField("method", r.Method).Debug("Request with unsupported method")
+
+		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
+		return
+	}
+
+	reqParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
+	if len(reqParts) != 3 {
+		log.WithField("request", reqParts).Debug("Requested URL is malformed")
+
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
+	}
+
+	reqId, delKey := reqParts[1], reqParts[2]
+
+	item, err := serv.store.Get(reqId, true)
+	if err == ErrNotFound {
+		log.WithField("ID", reqId).Debug("Requested non-existing ID")
+
+		http.Error(w, msgNotExists, http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
+
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
+	}
+
+	if item.DeletionKey != delKey {
+		log.WithField("ID", reqId).Warn("Deletion was requested with invalid key")
+
+		http.Error(w, msgDeletionKeyWrong, http.StatusForbidden)
+		return
+	}
+
+	if err := serv.store.Delete(item); err != nil {
+		log.WithError(err).WithField("ID", reqId).Error("Requested deletion failed")
+
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, msgDeletionSuccess)
+
+	log.WithField("ID", reqId).Info("Item was deleted by request")
 }
 
 // WebProtocol returns "http" or "https", based on the X-Forwarded-Proto header.
