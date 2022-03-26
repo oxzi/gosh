@@ -41,6 +41,8 @@ func init() {
 	if ipAddressStr != "" {
 		ipAddress = net.ParseIP(ipAddressStr)
 	}
+
+	internal.Hardening("~@network-io")
 }
 
 func getStorePath() string {

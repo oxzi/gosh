@@ -1,6 +1,6 @@
 // +build !linux
 
-package main
+package internal
 
 import (
 	"runtime"
@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// hardening will active some platform-specific hardening.
-func hardening() {
+// Hardening will active some platform-specific hardening.
+func Hardening(_ string) {
 	log.Debugf("No hardening available for %s/%s", runtime.GOOS, runtime.GOARCH)
 }
