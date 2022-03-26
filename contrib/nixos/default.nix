@@ -7,8 +7,11 @@ let
     name = "gosh";
 
     src = lib.cleanSource ./.;
+
     # TODO: One has to configure this one.
-    modSha256 = "0000000000000000000000000000000000000000000000000000";
+    vendorSha256 = "0000000000000000000000000000000000000000000000000000";
+
+    CGO_ENABLED = 0;
   };
 
   gosh-uid = 9001;
@@ -87,10 +90,39 @@ in {
             -store ${cfg.dataDir}
         '';
 
-        Type = "simple";
-
         User = "gosh";
         Group = "gosh";
+
+        NoNewPrivileges = true;
+
+        ProtectProc = "noaccess";
+        ProcSubset = "pid";
+
+        ProtectSystem = "full";
+        ProtectHome = true;
+
+        ReadOnlyPaths = "/";
+        ReadWritePaths = "${cfg.dataDir}";
+        InaccessiblePaths = "/boot /etc /mnt /root -/lost+found";
+        NoExecPaths = "/";
+        ExecPaths = "${gosh}/bin/goshd";
+
+        PrivateTmp = true;
+        PrivateDevices = true;
+        PrivateIPC = true;
+
+        ProtectHostname = true;
+        ProtectClock = true;
+        ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        RemoveIPC = true;
       };
     };
 
@@ -99,6 +131,7 @@ in {
       home = cfg.dataDir;
       createHome = true;
       uid = gosh-uid;
+      isSystemUser = true;
     };
 
     users.groups.gosh.gid = gosh-uid;
