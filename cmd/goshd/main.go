@@ -73,7 +73,8 @@ func init() {
 
 	if storePath == "" {
 		log.Fatal("Store Path must be set, see `--help`")
-	} else if contactMail == "" {
+	}
+	if contactMail == "" {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
@@ -90,7 +91,7 @@ func webserver(server *internal.Server) {
 		log.WithField("listen", listenAddr).Info("Starting web server")
 
 		if err := webServer.ListenAndServe(); err != http.ErrServerClosed {
-			log.WithError(err).Fatal("Web server errored")
+			log.WithError(err).Fatal("Web server failed")
 		}
 	}()
 
@@ -117,6 +118,6 @@ func main() {
 	webserver(server)
 
 	if err := server.Close(); err != nil {
-		log.WithError(err).Fatal("Closing errored")
+		log.WithError(err).Fatal("Closing failed")
 	}
 }

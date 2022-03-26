@@ -72,7 +72,7 @@ func checkStorePath(storep string) (err error) {
 
 func prettyPrintItem(item internal.Item) {
 	log.Infof("### Item: %s", item.ID)
-	log.Infof(" - Filename: %s (%s)", item.Filename, item.ContentType)
+	log.Infof(" - Filename: %q (%s)", item.Filename, item.ContentType)
 	log.Infof(" - Burn After Reading: %t", item.BurnAfterReading)
 	log.Infof(" - Created: %v", item.Created)
 	log.Infof(" - Expires: %v", item.Expires)
@@ -95,25 +95,26 @@ func main() {
 		log.WithError(err).WithField("path", storep).Fatal("Failed to start store")
 	}
 
-	if items, itemsErr := query(store); itemsErr != nil {
-		log.WithError(itemsErr).Warn("Failed to execute query")
-	} else {
-		if modeDelete {
-			for _, item := range items {
-				log.WithField("ID", item.ID).Info("Deleting Item")
+	items, err := query(store)
+	if err != nil {
+		log.WithError(err).Error("Failed to execute query")
+	}
 
-				if err := store.Delete(item); err != nil {
-					log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
-				}
+	if modeDelete {
+		for _, item := range items {
+			log.WithField("ID", item.ID).Info("Deleting Item")
+
+			if err := store.Delete(item); err != nil {
+				log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 			}
-		} else {
-			for _, item := range items {
-				prettyPrintItem(item)
-			}
+		}
+	} else {
+		for _, item := range items {
+			prettyPrintItem(item)
 		}
 	}
 
 	if err := store.Close(); err != nil {
-		log.WithError(err).Fatal("Closing errored")
+		log.WithError(err).Fatal("Closing failed")
 	}
 }

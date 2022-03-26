@@ -40,7 +40,7 @@ func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 		err = raErr
 		return
 	} else if remoteAddrIp := net.ParseIP(remoteAddr); remoteAddrIp == nil {
-		err = fmt.Errorf("Failed to parse the remote IP \"%s\"", remoteAddr)
+		err = fmt.Errorf("Failed to parse the remote IP %q", remoteAddr)
 		return
 	} else {
 		owners[RemoteAddr] = remoteAddrIp
@@ -50,7 +50,7 @@ func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 	for _, headerKey := range ownerHeaders {
 		if headerVal := r.Header.Get(string(headerKey)); headerVal != "" {
 			if headerIp := net.ParseIP(headerVal); headerIp == nil {
-				err = fmt.Errorf("Failed to parse an IP for %s from \"%s\"", headerKey, headerVal)
+				err = fmt.Errorf("Failed to parse an IP for %q from %q", headerKey, headerVal)
 				return
 			} else {
 				owners[headerKey] = headerIp
@@ -77,9 +77,9 @@ type Item struct {
 }
 
 var (
-	ErrLifetimeToLong = errors.New("Lifetime is greater maximum lifetime")
+	ErrLifetimeTooLong = errors.New("Lifetime is greater than maximum lifetime")
 
-	ErrFileToBig = errors.New("File size is greater maxium filesize")
+	ErrFileTooBig = errors.New("File size is greater than maxium filesize")
 
 	filenamePattern = regexp.MustCompile(`[^0-9A-Za-z-_.]`)
 )
@@ -106,9 +106,9 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	}()
 
 	if fileHeader.Size > maxSize {
-		err = ErrFileToBig
+		err = ErrFileTooBig
 		return
-	} else if fileHeader.Size == 0 {
+	} else if fileHeader.Size <= 0 {
 		err = fmt.Errorf("File size is zero")
 		return
 	}
@@ -135,7 +135,7 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 		err = parseLtErr
 		return
 	} else if parseLt > maxLifetime {
-		err = ErrLifetimeToLong
+		err = ErrLifetimeTooLong
 		return
 	} else {
 		item.Expires = item.Created.Add(parseLt)

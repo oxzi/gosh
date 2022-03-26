@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/akamensky/base58"
-	"github.com/timshannon/badgerhold"
+	"github.com/timshannon/badgerhold/v4"
 )
 
 const (
@@ -47,6 +47,7 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 	for _, dir := range []string{baseDir, s.databaseDir(), s.storageDir()} {
 		if _, stat := os.Stat(dir); os.IsNotExist(stat) {
 			if err = os.Mkdir(dir, 0700); err != nil {
+				log.WithError(err).Error("Cannot create directory")
 				return
 			}
 		}
@@ -94,7 +95,7 @@ func (s *Store) cleanupExired() {
 
 		case <-ticker.C:
 			if err := s.DeleteExpired(); err != nil {
-				log.WithError(err).Warn("Deletion of expired Items errored")
+				log.WithError(err).Error("Deletion of expired Items failed")
 			}
 		}
 	}
@@ -102,11 +103,11 @@ func (s *Store) cleanupExired() {
 
 // createID creates a random ID for a new Item.
 func (s *Store) createID() (id string, err error) {
-	// 4 Bytes of randomnes -> 4*8 = 32 Bits of randomness
+	// 4 Bytes of randomness -> 4*8 = 32 Bits of randomness
 	// 2^32 = 4 294 967 296 possible combinations
 	idBuff := make([]byte, 4)
 
-	for {
+	for i := 0; i < 32; i++ {
 		_, err = rand.Read(idBuff)
 		if err != nil {
 			return
@@ -114,13 +115,16 @@ func (s *Store) createID() (id string, err error) {
 
 		id = string(base58.Encode(idBuff))
 
-		if bhErr := s.bh.Get(id, Item{}); bhErr == badgerhold.ErrNotFound {
+		if err = s.bh.Get(id, Item{}); err == badgerhold.ErrNotFound {
+			err = nil
 			return
-		} else if bhErr != nil {
-			err = bhErr
+		} else if err != nil {
 			return
 		}
 	}
+
+	err = errors.New("Failed to calculate an ID")
+	return
 }
 
 // Close the Store and its database.
@@ -144,7 +148,7 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 		log.WithField("ID", id).Debug("Requested Item was not found")
 		err = ErrNotFound
 	} else if err != nil {
-		log.WithField("ID", id).WithError(err).Warn("Requested Item errored")
+		log.WithField("ID", id).WithError(err).Error("Requested Item failed")
 	} else if err == nil && delExpired && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
@@ -152,7 +156,7 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 		}).Info("Requested Item is expired, will be deleted")
 
 		if err := s.Delete(i); err != nil {
-			log.WithError(err).WithField("ID", id).Warn("Deletion of expired Item errored")
+			log.WithError(err).WithField("ID", id).Error("Deletion of expired Item failed")
 		}
 
 		err = ErrNotFound
@@ -172,7 +176,7 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 
 	id, err = s.createID()
 	if err != nil {
-		log.WithError(err).Warn("Creation of an ID for a new Item errored")
+		log.WithError(err).Error("Creation of an ID for a new Item failed")
 		return
 	}
 
@@ -181,13 +185,13 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into database errored")
+		log.WithField("ID", i.ID).WithError(err).Error("Insertion of an Item into database failed")
 		return
 	}
 
 	err = i.WriteFile(file, s.storageDir())
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Insertion of an Item into storage errored")
+		log.WithField("ID", i.ID).WithError(err).Error("Insertion of an Item into storage failed")
 		return
 	}
 
@@ -217,13 +221,13 @@ func (s *Store) Delete(i Item) (err error) {
 
 	err = s.bh.Delete(i.ID, i)
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Deletion of Item from database errored")
+		log.WithField("ID", i.ID).WithError(err).Error("Deletion of Item from database failed")
 		return
 	}
 
 	err = i.DeleteFile(s.storageDir())
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Warn("Deletion of Item from storage errored")
+		log.WithField("ID", i.ID).WithError(err).Error("Deletion of Item from storage failed")
 		return
 	}
 

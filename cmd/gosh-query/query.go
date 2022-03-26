@@ -6,7 +6,7 @@ import (
 
 	"github.com/oxzi/gosh/internal"
 
-	"github.com/timshannon/badgerhold"
+	"github.com/timshannon/badgerhold/v4"
 )
 
 func query(store *internal.Store) (items []internal.Item, err error) {

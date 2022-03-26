@@ -14,6 +14,8 @@ import (
 const indexTpl = `<!DOCTYPE html>
 <html>
 	<head>
+		<title>gosh! Go Share</title>
+
 		<style>
 			* {
 				font-family: monospace;
@@ -203,10 +205,10 @@ func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		serv.handleIndex(w, r)
 
-	case "POST":
+	case http.MethodPost:
 		serv.handleUpload(w, r)
 
 	default:
@@ -219,7 +221,7 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	t, err := template.New("index").Parse(indexTpl)
 	if err != nil {
-		log.WithError(err).Warn("Failed to parse template")
+		log.WithError(err).Error("Failed to parse template")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -245,24 +247,24 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := t.Execute(w, data); err != nil {
-		log.WithError(err).Warn("Failed to execute template")
+		log.WithError(err).Error("Failed to execute template")
 	}
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	item, f, err := NewItem(r, serv.maxSize, serv.maxLifetime)
-	if err == ErrLifetimeToLong {
-		log.Info("New Item with a too great lifetime was rejected")
+	if err == ErrLifetimeTooLong {
+		log.Info("New Item with a too long lifetime was rejected")
 
 		http.Error(w, msgLifetimeExceeds, http.StatusNotAcceptable)
 		return
-	} else if err == ErrFileToBig {
+	} else if err == ErrFileTooBig {
 		log.Info("New Item with a too great file size was rejected")
 
 		http.Error(w, msgFileSizeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err != nil {
-		log.WithError(err).Warn("Failed to create new Item")
+		log.WithError(err).Error("Failed to create new Item")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -275,16 +277,15 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	itemId, err := serv.store.Put(item, f)
 	if err != nil {
-		log.WithError(err).Warn("Failed to store Item")
+		log.WithError(err).Error("Failed to store Item")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	log.WithFields(log.Fields{
-		"ID":       itemId,
-		"filename": item.Filename,
-		"expires":  item.Expires,
+		"ID":      itemId,
+		"expires": item.Expires,
 	}).Info("Uploaded new Item")
 
 	w.WriteHeader(http.StatusOK)
@@ -292,8 +293,8 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		log.WithField("method", r.Method).Debug("Request got wrong method")
+	if r.Method != http.MethodGet {
+		log.WithField("method", r.Method).Debug("Request with unsupported method")
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
@@ -308,51 +309,53 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.WithError(err).WithField("ID", reqId).Warn("Requesting errored")
+		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
-	if f, err := serv.store.GetFile(item); err != nil {
-		log.WithError(err).WithField("ID", item.ID).Warn("Reading file errored")
+	f, err := serv.store.GetFile(item)
+	if err != nil {
+		log.WithError(err).WithField("ID", item.ID).Error("Reading file failed")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
-	} else {
-		mimeType, mimeErr := serv.mimeMap.Substitute(item.ContentType)
-		if mimeErr != nil {
-			log.WithError(err).WithField("ID", item.ID).Warn("Substituting MIME errored")
+	}
 
-			http.Error(w, msgGenericError, http.StatusBadRequest)
-			return
-		}
-
-		w.Header().Set("Content-Type", mimeType)
-		w.Header().Set("Content-Disposition",
-			fmt.Sprintf("inline; filename=\"%s\"", item.Filename))
-		w.WriteHeader(http.StatusOK)
-
-		if _, err := io.Copy(w, f); err != nil {
-			// This might happen if the peer resets the connection, e.g., if
-			// curl tries to print a non text file to stdout.
-			log.WithError(err).WithField("ID", item.ID).Warn("Writing file errored")
-		}
+	mimeType, err := serv.mimeMap.Substitute(item.ContentType)
+	if err != nil {
+		log.WithError(err).WithField("ID", item.ID).Error("Substituting MIME failed")
 
 		if err := f.Close(); err != nil {
-			log.WithError(err).WithField("ID", item.ID).Warn("Closing file errored")
+			log.WithError(err).WithField("ID", item.ID).Error("Closing file failed")
 		}
 
-		log.WithFields(log.Fields{
-			"ID":       item.ID,
-			"filename": item.Filename,
-		}).Info("Item was requested")
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
 	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("inline; filename=\"%s\"", item.Filename))
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := io.Copy(w, f); err != nil {
+		// This might happen if the peer resets the connection, e.g., if
+		// curl tries to print a non text file to stdout.
+		log.WithError(err).WithField("ID", item.ID).Warn("Writing file failed")
+	}
+
+	if err := f.Close(); err != nil {
+		log.WithError(err).WithField("ID", item.ID).Error("Closing file failed")
+	}
+
+	log.WithField("ID", item.ID).Info("Item was requested")
 
 	if item.BurnAfterReading {
 		log.WithField("ID", item.ID).Info("Item will be burned")
 		if err := serv.store.Delete(item); err != nil {
-			log.WithError(err).WithField("ID", item.ID).Warn("Deletion errored")
+			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 		}
 	}
 }

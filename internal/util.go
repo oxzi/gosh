@@ -42,7 +42,8 @@ var (
 	ErrNoMatch = errors.New("Input does not match pattern")
 )
 
-// getHtmlDurationPattern creates a regular expression pattern to match duration strings within the browser.
+// getHtmlDurationPattern creates a regular expression pattern to match duration
+// strings within the browser.
 func getHtmlDurationPattern() string {
 	var b strings.Builder
 

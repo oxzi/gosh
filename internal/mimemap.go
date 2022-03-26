@@ -40,7 +40,7 @@ func NewMimeMap(file io.Reader) (mm MimeMap, err error) {
 
 		mmKey, mmVal := mmFields[0], mmFields[1]
 		if _, exists := mm[mmKey]; exists {
-			err = fmt.Errorf("Key \"%s\" from line %d was already defined", mmKey, i)
+			err = fmt.Errorf("Key %q from line %d was already defined", mmKey, i)
 			return
 		} else {
 			mm[mmKey] = mmVal
@@ -57,13 +57,8 @@ func NewMimeMap(file io.Reader) (mm MimeMap, err error) {
 
 // MustDrop indicates if a MIME type must be dropped.
 func (mm MimeMap) MustDrop(mime string) bool {
-	if v, exists := mm[mime]; !exists {
-		return false
-	} else if v == MimeDrop {
-		return true
-	} else {
-		return false
-	}
+	v, exists := mm[mime]
+	return exists && (v == MimeDrop)
 }
 
 // Substitute returns the replaced MIME type and indicates with an error, if
