@@ -168,6 +168,9 @@ curl -F 'file=@foo.png' -F 'time=1d' http://our-server.example/
 
 # Or all together:
 curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
+
+# Print only URL as response:
+curl -F 'file=@foo.png' http://our-server.example/?onlyURL
 ```
 
 ## Shell function
