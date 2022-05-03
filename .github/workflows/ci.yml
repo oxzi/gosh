@@ -10,34 +10,20 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.13', '1.17' ]
+        go: [ '1.17' ]
 
     steps:
-    - name: Set up Go ${{ matrix.go }}
-      uses: actions/setup-go@v2
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go }}
 
-    - name: Check out code
-      uses: actions/checkout@v2
+    - run: go version
+    - run: go build ./...
+    - run: go test -race ./...
 
-    - name: Build on Go ${{ matrix.go }}
-      run: go build ./...
-
-    - name: Test
-      run: go test -race ./...
-
-
-  golangci:
-    name: Check golangci-lint
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v2
+    - uses: golangci/golangci-lint-action@v3
       with:
-        version: v1.39.0
+        skip-pkg-cache: true
+        skip-build-cache: true
