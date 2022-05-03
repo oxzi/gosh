@@ -115,6 +115,10 @@ const indexTpl = `<!DOCTYPE html>
 
 		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
 
+		Print only URL as response:
+
+		<pre>$ curl -F 'file=@foo.png' -F {{.Proto}}://{{.Hostname}}/?onlyURL</pre>
+
 		<h3>### form</h3>
 
 		<form
@@ -297,11 +301,17 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	baseUrl := fmt.Sprintf("%s://%s", WebProtocol(r), r.Host)
-	fmt.Fprintf(w, "Fetch:   %s/%s\n", baseUrl, itemId)
-	fmt.Fprintf(w, "Delete:  %s/del/%s/%s\n", baseUrl, itemId, item.DeletionKey)
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Expires: %v\n", item.Expires)
-	fmt.Fprintf(w, "Burn:    %t\n", item.BurnAfterReading)
+	onlyUrl := r.URL.Query().Has("onlyURL")
+
+	if onlyUrl {
+		fmt.Fprintf(w, "%s/%s\n", baseUrl, itemId)
+	} else {
+		fmt.Fprintf(w, "Fetch:   %s/%s\n", baseUrl, itemId)
+		fmt.Fprintf(w, "Delete:  %s/del/%s/%s\n", baseUrl, itemId, item.DeletionKey)
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Expires: %v\n", item.Expires)
+		fmt.Fprintf(w, "Burn:    %t\n", item.BurnAfterReading)
+	}
 }
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
