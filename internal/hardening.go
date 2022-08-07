@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package internal
@@ -9,6 +10,6 @@ import (
 )
 
 // Hardening will active some platform-specific hardening.
-func Hardening(_ string) {
-	log.Debugf("No hardening available for %s/%s", runtime.GOOS, runtime.GOARCH)
+func Hardening(useNetwork bool, storePath string) {
+	log.Warnf("No hardening available for %s/%s", runtime.GOOS, runtime.GOARCH)
 }

@@ -137,7 +137,7 @@ Usage of ./gosh-query:
   -ip-addr string
         Query for an IP address
   -store string
-        Path to the store, env variable GOSHSTORE can also be used
+        Path to the store
   -verbose
         Verbose logging
 ```

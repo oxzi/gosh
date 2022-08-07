@@ -26,7 +26,7 @@ func init() {
 
 	var ipAddressStr string
 
-	flag.StringVar(&storePath, "store", "", "Path to the store, env variable GOSHSTORE can also be used")
+	flag.StringVar(&storePath, "store", "", "Path to the store")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	flag.BoolVar(&modeDelete, "delete", false, "Delete selection")
 	flag.StringVar(&id, "id", "", "Query for an ID")
@@ -34,25 +34,17 @@ func init() {
 
 	flag.Parse()
 
+	if storePath == "" {
+		log.Fatal("Store Path must be set, see `--help`")
+	}
 	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
-
 	if ipAddressStr != "" {
 		ipAddress = net.ParseIP(ipAddressStr)
 	}
 
-	internal.Hardening("~@network-io")
-}
-
-func getStorePath() string {
-	if storePath != "" {
-		return storePath
-	} else if envPath := os.Getenv("GOSHSTORE"); envPath != "" {
-		return envPath
-	} else {
-		return "."
-	}
+	internal.Hardening(false, storePath)
 }
 
 func checkStorePath(storep string) (err error) {
@@ -88,14 +80,13 @@ func prettyPrintItem(item internal.Item) {
 }
 
 func main() {
-	storep := getStorePath()
-	if err := checkStorePath(storep); err != nil {
-		log.WithError(err).WithField("path", storep).Fatal("Failed to load store")
+	if err := checkStorePath(storePath); err != nil {
+		log.WithError(err).WithField("path", storePath).Fatal("Failed to load store")
 	}
 
-	store, err := internal.NewStore(storep, false)
+	store, err := internal.NewStore(storePath, false)
 	if err != nil {
-		log.WithError(err).WithField("path", storep).Fatal("Failed to start store")
+		log.WithError(err).WithField("path", storePath).Fatal("Failed to start store")
 	}
 
 	items, err := query(store)

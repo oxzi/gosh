@@ -78,7 +78,7 @@ func init() {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
-	internal.Hardening("")
+	internal.Hardening(true, storePath)
 }
 
 func webserver(server *internal.Server) {
