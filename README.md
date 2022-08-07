@@ -17,13 +17,14 @@ All files have a maximum lifetime and are then deleted.
 - Uploads can specify their own shorter lifetime
 - Each upload generates also generates a custom deletion URL
 - Burn after Reading: uploads can be deleted after the first download
+- Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
 - On Linux, there is seccomp-bpf protection
 
 
 ## Installation
 ### Generic Installation
 
-The system needs to have Go installed in version 1.13 or later.
+Go is required in a recent version; currently 1.17 or later.
 
 ```bash
 git clone https://github.com/oxzi/gosh.git
@@ -177,7 +178,7 @@ curl -F 'file=@foo.png' http://our-server.example/?onlyURL
 
 ### Fish, `contrib/fish/`
 
-A `fish`-funtion allow to easily upload a file to the server of your choice which needs to manually edited.
+A `fish`-function allow to easily upload a file to the server of your choice which needs to manually edited.
 With the `-b` or `--burn` flags you may decide to burn the file after reading.
 
 

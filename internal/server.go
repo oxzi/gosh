@@ -314,6 +314,45 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// hasClientCachedRequest if the client submits a conditional GET, e.g., If-Modified-Since.
+func (serv *Server) hasClientCachedRequest(r *http.Request, item Item) bool {
+	ims, imsErr := http.ParseTime(r.Header.Get("If-Modified-Since"))
+	if imsErr != nil {
+		return false
+	}
+
+	return item.Created.Before(ims) && item.Expires.After(ims)
+}
+
+// handleRequestServe is called from handleRequest when a valid Item should be served.
+func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, item Item) error {
+	f, err := serv.store.GetFile(item)
+	if err != nil {
+		return fmt.Errorf("reading file failed: %v", err)
+	}
+
+	defer f.Close()
+
+	mimeType, err := serv.mimeMap.Substitute(item.ContentType)
+	if err != nil {
+		return fmt.Errorf("substituting MIME failed: %v", err)
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", item.Filename))
+
+	// Original creation date might be seen as confidential.
+	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+
+	w.WriteHeader(http.StatusOK)
+
+	// An error might happen here if the peer resets the connection, e.g., if
+	// curl tries to print a non text file to stdout.
+	_, _ = io.Copy(w, f)
+
+	return nil
+}
+
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		log.WithField("method", r.Method).Debug("Request with unsupported method")
@@ -337,39 +376,17 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := serv.store.GetFile(item)
-	if err != nil {
-		log.WithError(err).WithField("ID", item.ID).Error("Reading file failed")
+	if serv.hasClientCachedRequest(r, item) {
+		log.WithField("ID", reqId).Debug("Requested with conditional GET; HTTP Status Code 304")
+		w.WriteHeader(http.StatusNotModified)
+	} else {
+		err := serv.handleRequestServe(w, r, item)
+		if err != nil {
+			log.WithError(err).WithField("ID", reqId).Warn("Serving the request failed")
 
-		http.Error(w, msgGenericError, http.StatusBadRequest)
-		return
-	}
-
-	mimeType, err := serv.mimeMap.Substitute(item.ContentType)
-	if err != nil {
-		log.WithError(err).WithField("ID", item.ID).Error("Substituting MIME failed")
-
-		if err := f.Close(); err != nil {
-			log.WithError(err).WithField("ID", item.ID).Error("Closing file failed")
+			http.Error(w, msgGenericError, http.StatusBadRequest)
+			return
 		}
-
-		http.Error(w, msgGenericError, http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Content-Disposition",
-		fmt.Sprintf("inline; filename=\"%s\"", item.Filename))
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := io.Copy(w, f); err != nil {
-		// This might happen if the peer resets the connection, e.g., if
-		// curl tries to print a non text file to stdout.
-		log.WithError(err).WithField("ID", item.ID).Warn("Writing file failed")
-	}
-
-	if err := f.Close(); err != nil {
-		log.WithError(err).WithField("ID", item.ID).Error("Closing file failed")
 	}
 
 	log.WithField("ID", item.ID).Info("Item was requested")
