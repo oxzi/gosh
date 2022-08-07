@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -34,7 +33,7 @@ func TestStore(t *testing.T) {
 	item := Item{Expires: time.Now().Add(time.Minute).UTC()}
 	itemData := newDummyReadCloser(bytes.NewBuffer([]byte("hello world")))
 
-	storageDir, err := ioutil.TempDir("", "db")
+	storageDir, err := os.MkdirTemp("", "db")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +85,7 @@ func TestStore(t *testing.T) {
 func TestStoreCreateId(t *testing.T) {
 	const ids = 1024
 
-	storageDir, err := ioutil.TempDir("", "db")
+	storageDir, err := os.MkdirTemp("", "db")
 	if err != nil {
 		t.Fatal(err)
 	}

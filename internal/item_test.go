@@ -3,7 +3,6 @@ package internal
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"mime/multipart"
 	"net"
@@ -165,7 +164,7 @@ func TestItem(t *testing.T) {
 				}
 			}
 
-			if itemDir, err := ioutil.TempDir("", ""); err != nil {
+			if itemDir, err := os.MkdirTemp("", ""); err != nil {
 				t.Fatal(err)
 			} else {
 				if err := i.WriteFile(f, itemDir); err != nil {
@@ -174,7 +173,7 @@ func TestItem(t *testing.T) {
 
 				if file, err := i.ReadFile(itemDir); err != nil {
 					t.Fatal(err)
-				} else if data, err := ioutil.ReadAll(file); err != nil {
+				} else if data, err := io.ReadAll(file); err != nil {
 					t.Fatal(err)
 				} else if !reflect.DeepEqual(tmpFileData, data) {
 					t.Fatalf("Data mismatches; got something of length %d and expected %d",
