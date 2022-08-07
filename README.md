@@ -18,7 +18,7 @@ All files have a maximum lifetime and are then deleted.
 - Each upload generates also generates a custom deletion URL
 - Burn after Reading: uploads can be deleted after the first download
 - Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
-- On Linux, there is seccomp-bpf protection
+- On Linux there is additional hardening through Landlock and seccomp-bpf
 
 
 ## Installation
