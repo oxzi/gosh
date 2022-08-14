@@ -14,17 +14,20 @@ import (
 )
 
 // hardeningLandlock with Landlock.
-func hardeningLandlock(storePath string) {
+func hardeningLandlock(storePath, listenAddr string) {
 	_, err := llsys.LandlockGetABIVersion()
 	if err != nil {
 		log.Warn("Landlock is not supported")
 		return
 	}
 
+	rwDirs := make([]string, 0)
+
 	storePath, err = filepath.Abs(storePath)
 	if err != nil {
 		log.WithError(err).Fatal("Cannot create an absolute store path")
 	}
+	rwDirs = append(rwDirs, storePath)
 
 	// To restrict a path, it needs to exists as the landlock_add_rule syscall
 	// works on an open file descriptor.
@@ -35,7 +38,16 @@ func hardeningLandlock(storePath string) {
 		}
 	}
 
-	if err := landlock.V2.BestEffort().RestrictPaths(landlock.RWDirs(storePath)); err != nil {
+	// With my kernel's landlock version, there was no possibility to unlink the
+	// file after being created. As it needs to exist, to be allowed but does not
+	// allowed to exist for Listen, this was a blocker. Thus, I allowed RW for the
+	// parent's directory, which itself also is far from being perfect.
+	if strings.HasPrefix(listenAddr, "fcgi:") {
+		socketAddr := listenAddr[len("fcgi:"):]
+		rwDirs = append(rwDirs, filepath.Dir(socketAddr))
+	}
+
+	if err := landlock.V2.BestEffort().RestrictPaths(landlock.RWDirs(rwDirs...)); err != nil {
 		log.WithError(err).Fatal("Failed to apply Landlock filter")
 	}
 }
@@ -74,7 +86,7 @@ func hardeningSeccompBpf(useNetwork bool) {
 }
 
 // Hardening is achieved on Linux with Landlock and seccomp-bpf.
-func Hardening(useNetwork bool, storePath string) {
-	hardeningLandlock(storePath)
+func Hardening(useNetwork bool, storePath, listenAddr string) {
+	hardeningLandlock(storePath, listenAddr)
 	hardeningSeccompBpf(useNetwork)
 }

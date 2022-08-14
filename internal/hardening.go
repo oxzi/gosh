@@ -10,6 +10,6 @@ import (
 )
 
 // Hardening will active some platform-specific hardening.
-func Hardening(useNetwork bool, storePath string) {
+func Hardening(useNetwork bool, storePath, listenAddr string) {
 	log.Warnf("No hardening available for %s/%s", runtime.GOOS, runtime.GOARCH)
 }

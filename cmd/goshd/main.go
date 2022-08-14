@@ -1,11 +1,12 @@
 package main
 
 import (
-	"context"
 	"flag"
+	"net"
 	"net/http"
+	"net/http/fcgi"
 	"os"
-	"os/signal"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -37,7 +38,7 @@ func init() {
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
 	flag.StringVar(&mimeMapStr, "mimemap", "", "MimeMap to substitute/drop MIMEs")
-	flag.StringVar(&listenAddr, "listen", ":8080", "Listen address for the HTTP server")
+	flag.StringVar(&listenAddr, "listen", ":8080", "Either an address for a HTTP server or a path prefixed with 'fcgi:' for a FastCGI unix socket")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 
 	flag.Parse()
@@ -78,34 +79,41 @@ func init() {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
-	internal.Hardening(true, storePath)
+	internal.Hardening(true, storePath, listenAddr)
 }
 
-func webserver(server *internal.Server) {
+func serveHttpd(server *internal.Server) {
 	webServer := &http.Server{
 		Addr:    listenAddr,
 		Handler: server,
 	}
 
-	go func() {
-		log.WithField("listen", listenAddr).Info("Starting web server")
+	log.WithField("listen", listenAddr).Info("Starting web server")
 
-		if err := webServer.ListenAndServe(); err != http.ErrServerClosed {
-			log.WithError(err).Fatal("Web server failed")
-		}
-	}()
-
-	stopChan := make(chan os.Signal, 1)
-	signal.Notify(stopChan, os.Interrupt)
-
-	<-stopChan
-	log.Info("Closing web server")
-
-	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Second)
-	if err := webServer.Shutdown(ctx); err != nil {
-		log.WithError(err).Fatal("Failed to shutdown web server")
+	if err := webServer.ListenAndServe(); err != http.ErrServerClosed {
+		log.WithError(err).Fatal("Web server failed")
 	}
-	ctxCancel()
+}
+
+func serveFcgi(server *internal.Server) {
+	socketAddr := listenAddr[len("fcgi:"):]
+
+	if _, stat := os.Stat(socketAddr); stat == nil {
+		if err := os.Remove(socketAddr); err != nil {
+			log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot cleanup old socket file")
+		}
+	}
+
+	ln, err := net.Listen("unix", socketAddr)
+	if err != nil {
+		log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot listen on unix socket")
+	}
+
+	log.WithField("socket", socketAddr).Info("Starting FastCGI server")
+
+	if err := fcgi.Serve(ln, server); err != nil {
+		log.WithError(err).Fatal("FastCGI server failed")
+	}
 }
 
 func main() {
@@ -115,9 +123,11 @@ func main() {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
 
-	webserver(server)
+	defer server.Close()
 
-	if err := server.Close(); err != nil {
-		log.WithError(err).Fatal("Closing failed")
+	if strings.HasPrefix(listenAddr, "fcgi:") {
+		serveFcgi(server)
+	} else {
+		serveHttpd(server)
 	}
 }

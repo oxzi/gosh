@@ -7,6 +7,7 @@ All files have a maximum lifetime and are then deleted.
 ## Features
 
 - Standalone HTTP web server, no additional server needed (might be proxied for HTTPS)
+- Supports a FastCGI server over HTTP if `--listen fcgi:/path/to.sock`
 - Store with both files and some metadata
 - Only safe uploader's IP address for legal reasons, anonymous download
 - File and all metadata are automatically deleted after expiration
