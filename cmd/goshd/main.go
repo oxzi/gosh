@@ -22,6 +22,7 @@ var (
 	mimeMap     internal.MimeMap
 	listenAddr  string
 	verbose     bool
+	socketFd    **os.File
 )
 
 func init() {
@@ -79,7 +80,10 @@ func init() {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
-	internal.Hardening(true, storePath, listenAddr)
+	socketFd = new(*os.File)
+	*socketFd = nil
+
+	internal.Hardening(true, &storePath, &listenAddr, socketFd)
 }
 
 func serveHttpd(server *internal.Server) {
@@ -96,15 +100,24 @@ func serveHttpd(server *internal.Server) {
 }
 
 func serveFcgi(server *internal.Server) {
+	var (
+		ln  net.Listener
+		err error
+	)
+
 	socketAddr := listenAddr[len("fcgi:"):]
 
-	if _, stat := os.Stat(socketAddr); stat == nil {
-		if err := os.Remove(socketAddr); err != nil {
-			log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot cleanup old socket file")
+	if *socketFd != nil {
+		ln, err = net.FileListener(*socketFd)
+	} else {
+		if _, stat := os.Stat(socketAddr); stat == nil {
+			if err = os.Remove(socketAddr); err != nil {
+				log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot cleanup old socket file")
+			}
 		}
-	}
 
-	ln, err := net.Listen("unix", socketAddr)
+		ln, err = net.Listen("unix", socketAddr)
+	}
 	if err != nil {
 		log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot listen on unix socket")
 	}

@@ -86,7 +86,7 @@ func hardeningSeccompBpf(useNetwork bool) {
 }
 
 // Hardening is achieved on Linux with Landlock and seccomp-bpf.
-func Hardening(useNetwork bool, storePath, listenAddr string) {
-	hardeningLandlock(storePath, listenAddr)
+func Hardening(useNetwork bool, storePath, listenAddr *string, socketFd **os.File) {
+	hardeningLandlock(*storePath, *listenAddr)
 	hardeningSeccompBpf(useNetwork)
 }
