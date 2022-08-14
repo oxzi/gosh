@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/fcgi"
 	"strings"
 	"text/template"
 	"time"
@@ -450,8 +451,14 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	log.WithField("ID", reqId).Info("Item was deleted by request")
 }
 
-// WebProtocol returns "http" or "https", based on the X-Forwarded-Proto header.
+// WebProtocol returns "http" or "https", based either on the X-Forwarded-Proto
+// header or FastCGI's SERVER_PORT variable.
 func WebProtocol(r *http.Request) string {
+	fcgiParams := fcgi.ProcessEnv(r)
+	if serverPort, ok := fcgiParams["SERVER_PORT"]; ok && serverPort == "443" {
+		return "https"
+	}
+
 	if xfwp := r.Header.Get("X-Forwarded-Proto"); xfwp != "" {
 		return xfwp
 	} else {
