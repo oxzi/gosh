@@ -1,8 +1,9 @@
+//go:build linux
+
 package internal
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -13,38 +14,26 @@ import (
 	syscallset "github.com/oxzi/syscallset-go"
 )
 
-// hardeningLandlock with Landlock.
-func hardeningLandlock(storePath, listenAddr string) {
+// landlock limits the available paths through Linux' landlock.
+func (opts *HardeningOpts) landlock() {
 	_, err := llsys.LandlockGetABIVersion()
 	if err != nil {
-		log.Warn("Landlock is not supported")
+		log.WithError(err).Warn("Landlock is not supported")
 		return
 	}
 
-	rwDirs := make([]string, 0)
-
-	storePath, err = filepath.Abs(storePath)
-	if err != nil {
-		log.WithError(err).Fatal("Cannot create an absolute store path")
-	}
-	rwDirs = append(rwDirs, storePath)
-
 	// To restrict a path, it needs to exists as the landlock_add_rule syscall
 	// works on an open file descriptor.
-	if _, stat := os.Stat(storePath); os.IsNotExist(stat) {
-		err := os.Mkdir(storePath, 0700)
+	if _, stat := os.Stat(*(opts.StoreDir)); os.IsNotExist(stat) {
+		err := os.Mkdir(*(opts.StoreDir), 0700)
 		if err != nil {
 			log.WithError(err).Fatal("Cannot create store path")
 		}
 	}
 
-	// With my kernel's landlock version, there was no possibility to unlink the
-	// file after being created. As it needs to exist, to be allowed but does not
-	// allowed to exist for Listen, this was a blocker. Thus, I allowed RW for the
-	// parent's directory, which itself also is far from being perfect.
-	if strings.HasPrefix(listenAddr, "fcgi:") {
-		socketAddr := listenAddr[len("fcgi:"):]
-		rwDirs = append(rwDirs, filepath.Dir(socketAddr))
+	rwDirs := []string{*(opts.StoreDir)}
+	if opts.ListenUnixAddr != nil {
+		rwDirs = append(rwDirs, *(opts.ListenUnixAddr))
 	}
 
 	if err := landlock.V2.BestEffort().RestrictPaths(landlock.RWDirs(rwDirs...)); err != nil {
@@ -52,8 +41,8 @@ func hardeningLandlock(storePath, listenAddr string) {
 	}
 }
 
-// hardeningSeccompBpf with a seccomp-bpf filter.
-func hardeningSeccompBpf(useNetwork bool) {
+// seccompBpf from Linux is used to limit the available syscalls.
+func (opts *HardeningOpts) seccompBpf() {
 	if !syscallset.IsSupported() {
 		log.Warn("No seccomp-bpf support is available")
 		return
@@ -76,7 +65,7 @@ func hardeningSeccompBpf(useNetwork bool) {
 		"~@swap",
 		"~execve ~execveat ~fork ~kill",
 	}
-	if !useNetwork {
+	if opts.ListenTcpAddr == nil && opts.ListenUnixAddr == nil {
 		filter = append(filter, "~@network-io")
 	}
 
@@ -85,8 +74,9 @@ func hardeningSeccompBpf(useNetwork bool) {
 	}
 }
 
-// Hardening is achieved on Linux with Landlock and seccomp-bpf.
-func Hardening(useNetwork bool, storePath, listenAddr *string, socketFd **os.File) {
-	hardeningLandlock(*storePath, *listenAddr)
-	hardeningSeccompBpf(useNetwork)
+// Apply both Unix and Linux specific hardening.
+func (opts *HardeningOpts) Apply() {
+	opts.applyUnix()
+	opts.landlock()
+	opts.seccompBpf()
 }

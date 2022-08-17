@@ -20,9 +20,8 @@ var (
 	maxLifetime time.Duration
 	contactMail string
 	mimeMap     internal.MimeMap
-	listenAddr  string
-	verbose     bool
-	socketFd    **os.File
+	fcgiServer  bool
+	socketFd    *os.File
 )
 
 func init() {
@@ -32,6 +31,9 @@ func init() {
 		maxLifetimeStr string
 		maxFilesizeStr string
 		mimeMapStr     string
+		listenAddr     string
+		user           string
+		verbose        bool
 	)
 
 	flag.StringVar(&storePath, "store", "", "Path to the store")
@@ -39,7 +41,9 @@ func init() {
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
 	flag.StringVar(&mimeMapStr, "mimemap", "", "MimeMap to substitute/drop MIMEs")
-	flag.StringVar(&listenAddr, "listen", ":8080", "Either an address for a HTTP server or a path prefixed with 'fcgi:' for a FastCGI unix socket")
+	flag.StringVar(&listenAddr, "listen", ":8080", "Either a TCP listen address or an Unix domain socket")
+	flag.BoolVar(&fcgiServer, "fcgi", false, "Serve a FastCGI server instead of a HTTP server")
+	flag.StringVar(&user, "user", "", "User to drop privileges to, also create a chroot - requires root permissions")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 
 	flag.Parse()
@@ -80,65 +84,60 @@ func init() {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
-	socketFd = new(*os.File)
-	*socketFd = nil
-
-	internal.Hardening(true, &storePath, &listenAddr, socketFd)
-}
-
-func serveHttpd(server *internal.Server) {
-	webServer := &http.Server{
-		Addr:    listenAddr,
-		Handler: server,
+	hardeningOpts := &internal.HardeningOpts{
+		StoreDir: &storePath,
 	}
 
-	log.WithField("listen", listenAddr).Info("Starting web server")
-
-	if err := webServer.ListenAndServe(); err != http.ErrServerClosed {
-		log.WithError(err).Fatal("Web server failed")
+	if strings.HasPrefix(listenAddr, ".") || strings.HasPrefix(listenAddr, "/") {
+		hardeningOpts.ListenUnixAddr = &listenAddr
+	} else {
+		hardeningOpts.ListenTcpAddr = &listenAddr
 	}
+	if user != "" {
+		hardeningOpts.ChangeUser = &user
+	}
+
+	hardeningOpts.Apply()
+
+	socketFd = hardeningOpts.ListenSocket
 }
 
 func serveFcgi(server *internal.Server) {
-	var (
-		ln  net.Listener
-		err error
-	)
-
-	socketAddr := listenAddr[len("fcgi:"):]
-
-	if *socketFd != nil {
-		ln, err = net.FileListener(*socketFd)
-	} else {
-		if _, stat := os.Stat(socketAddr); stat == nil {
-			if err = os.Remove(socketAddr); err != nil {
-				log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot cleanup old socket file")
-			}
-		}
-
-		ln, err = net.Listen("unix", socketAddr)
-	}
+	ln, err := net.FileListener(socketFd)
 	if err != nil {
-		log.WithField("socket", socketAddr).WithError(err).Fatal("Cannot listen on unix socket")
+		log.WithError(err).Fatal("Cannot listen on socket")
 	}
 
-	log.WithField("socket", socketAddr).Info("Starting FastCGI server")
-
+	log.Info("Starting FastCGI server")
 	if err := fcgi.Serve(ln, server); err != nil {
 		log.WithError(err).Fatal("FastCGI server failed")
 	}
 }
 
+func serveHttpd(server *internal.Server) {
+	webServer := &http.Server{
+		Handler: server,
+	}
+	ln, err := net.FileListener(socketFd)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot listen on socket")
+	}
+
+	log.Info("Starting web server")
+	if err := webServer.Serve(ln); err != http.ErrServerClosed {
+		log.WithError(err).Fatal("Web server failed")
+	}
+}
+
 func main() {
-	server, err := internal.NewServer(
-		storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
+	server, err := internal.NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
 
 	defer server.Close()
 
-	if strings.HasPrefix(listenAddr, "fcgi:") {
+	if fcgiServer {
 		serveFcgi(server)
 	} else {
 		serveHttpd(server)

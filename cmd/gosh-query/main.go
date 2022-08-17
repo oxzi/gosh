@@ -24,27 +24,39 @@ var (
 func init() {
 	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
 
-	var ipAddressStr string
+	var (
+		user         string
+		ipAddressStr string
+	)
 
-	flag.StringVar(&storePath, "store", "", "Path to the store")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	flag.StringVar(&user, "user", "", "User to drop privileges to, also create a chroot - requires root permissions")
+	flag.StringVar(&storePath, "store", "", "Path to the store")
 	flag.BoolVar(&modeDelete, "delete", false, "Delete selection")
 	flag.StringVar(&id, "id", "", "Query for an ID")
 	flag.StringVar(&ipAddressStr, "ip-addr", "", "Query for an IP address")
 
 	flag.Parse()
 
-	if storePath == "" {
-		log.Fatal("Store Path must be set, see `--help`")
-	}
 	if verbose {
 		log.SetLevel(log.DebugLevel)
+	}
+	if storePath == "" {
+		log.Fatal("Store Path must be set, see `--help`")
 	}
 	if ipAddressStr != "" {
 		ipAddress = net.ParseIP(ipAddressStr)
 	}
 
-	internal.Hardening(false, storePath)
+	hardeningOpts := &internal.HardeningOpts{
+		StoreDir: &storePath,
+	}
+
+	if user != "" {
+		hardeningOpts.ChangeUser = &user
+	}
+
+	hardeningOpts.Apply()
 }
 
 func checkStorePath(storep string) (err error) {
