@@ -64,19 +64,6 @@ func init() {
 		maxFilesize = bs
 	}
 
-	if mimeMapStr == "" {
-		mimeMap = make(internal.MimeMap)
-	} else {
-		if f, err := os.Open(mimeMapStr); err != nil {
-			log.WithError(err).Fatal("Failed to open MimeMap")
-		} else if mm, err := internal.NewMimeMap(f); err != nil {
-			log.WithError(err).Fatal("Failed to parse MimeMap")
-		} else {
-			f.Close()
-			mimeMap = mm
-		}
-	}
-
 	if storePath == "" {
 		log.Fatal("Store Path must be set, see `--help`")
 	}
@@ -96,10 +83,26 @@ func init() {
 	if user != "" {
 		hardeningOpts.ChangeUser = &user
 	}
+	if mimeMapStr != "" {
+		hardeningOpts.MimeMapFile = &mimeMapStr
+	}
 
 	hardeningOpts.Apply()
 
 	socketFd = hardeningOpts.ListenSocket
+
+	if mimeMapStr == "" {
+		mimeMap = make(internal.MimeMap)
+	} else {
+		if f, err := os.Open(mimeMapStr); err != nil {
+			log.WithError(err).Fatal("Failed to open MimeMap")
+		} else if mm, err := internal.NewMimeMap(f); err != nil {
+			log.WithError(err).Fatal("Failed to parse MimeMap")
+		} else {
+			f.Close()
+			mimeMap = mm
+		}
+	}
 }
 
 func serveFcgi(server *internal.Server) {

@@ -31,12 +31,15 @@ func (opts *HardeningOpts) landlock() {
 		}
 	}
 
-	rwDirs := []string{*(opts.StoreDir)}
+	paths := []landlock.PathOpt{landlock.RWDirs(*(opts.StoreDir))}
 	if opts.ListenUnixAddr != nil {
-		rwDirs = append(rwDirs, *(opts.ListenUnixAddr))
+		paths = append(paths, landlock.ROFiles(*(opts.ListenUnixAddr)))
+	}
+	if opts.MimeMapFile != nil {
+		paths = append(paths, landlock.ROFiles(*(opts.MimeMapFile)))
 	}
 
-	if err := landlock.V2.BestEffort().RestrictPaths(landlock.RWDirs(rwDirs...)); err != nil {
+	if err := landlock.V2.BestEffort().RestrictPaths(paths...); err != nil {
 		log.WithError(err).Fatal("Failed to apply Landlock filter")
 	}
 }

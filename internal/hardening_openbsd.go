@@ -21,6 +21,11 @@ func (opts *HardeningOpts) unveil() {
 			log.WithError(err).Fatal("Cannot unveil Unix domain socket")
 		}
 	}
+	if opts.MimeMapFile != nil {
+		if err := syscall.Unveil(*(opts.MimeMapFile), "r"); err != nil {
+			log.WithError(err).Fatal("Cannot unveil Unix domain socket")
+		}
+	}
 
 	if err := syscall.UnveilBlock(); err != nil {
 		log.WithError(err).Fatal("Cannot unveil(NULL, NULL)")

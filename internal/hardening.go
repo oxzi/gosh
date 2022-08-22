@@ -19,6 +19,8 @@ type HardeningOpts struct {
 	ListenTcpAddr *string
 	// ListenUnixAddr is the path for a Unix domain socket; MIGHT be set.
 	ListenUnixAddr *string
+	// MimeMapFile is the path to an existing MimeMap file; MIGHT be set.
+	MimeMapFile *string
 	// ChangeUser is a system user which identity should be used; MIGHT be set.
 	ChangeUser *string
 

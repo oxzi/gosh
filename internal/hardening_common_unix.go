@@ -24,6 +24,9 @@ func (opts *HardeningOpts) normalizePaths() {
 	if opts.ListenUnixAddr != nil {
 		pathObjs = append(pathObjs, opts.ListenUnixAddr)
 	}
+	if opts.MimeMapFile != nil {
+		pathObjs = append(pathObjs, opts.MimeMapFile)
+	}
 
 	for _, pathObj := range pathObjs {
 		absPathObj, err := filepath.Abs(*pathObj)
@@ -113,6 +116,9 @@ func (opts *HardeningOpts) chroot() {
 	if opts.ListenUnixAddr != nil {
 		dirs = append(dirs, strings.Split(filepath.Dir(*(opts.ListenUnixAddr)), sep))
 	}
+	if opts.MimeMapFile != nil {
+		dirs = append(dirs, strings.Split(filepath.Dir(*(opts.MimeMapFile)), sep))
+	}
 
 	rootParts := []string{}
 	for i := range dirs[0] {
@@ -146,6 +152,9 @@ func (opts *HardeningOpts) chroot() {
 	*(opts.StoreDir) = (*(opts.StoreDir))[len(rootDir):]
 	if opts.ListenUnixAddr != nil {
 		*(opts.ListenUnixAddr) = (*(opts.ListenUnixAddr))[len(rootDir):]
+	}
+	if opts.MimeMapFile != nil {
+		*(opts.MimeMapFile) = (*(opts.MimeMapFile))[len(rootDir):]
 	}
 
 	log.WithField("chroot", rootDir).Debug("Switched to chroot environment")
