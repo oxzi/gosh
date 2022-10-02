@@ -31,11 +31,11 @@ Go is required in a recent version; currently 1.17 or later.
 git clone https://github.com/oxzi/gosh.git
 cd gosh
 
-go build ./cmd/goshd
-go build ./cmd/gosh-query
+CGO_ENABLED=0 go build -gcflags="all=-N -l" ./cmd/goshd
+CGO_ENABLED=0 go build -gcflags="all=-N -l" ./cmd/gosh-query
 ```
 
-### NixOS Module
+### NixOS
 
 On a NixOS system one can configure gosh as a module. Have look at the example in `contrib/nixos/`.
 
@@ -44,7 +44,7 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
 
 { config, pkgs, ... }:
 {
-  imports = [ /path/to/gosh/repo/ ];
+  imports = [ /path/to/contrib/nixos/ ];  # TODO: copy or link the contrib/nixos/default.nix
 
   services = {
     gosh = {
@@ -79,6 +79,42 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
 }
 ```
 
+### OpenBSD
+
+Start by (cross-) compiling `goshd` for OpenBSD as described in the generic instructions above.
+
+Afterwards copy the `./contrib/openbsd/goshd-rcd` rc.d file to `/etc/rc.d/goshd` and modify if necessary.
+You should at least replace `example.org` by your domain and create the directories below `/var/www`.
+
+The service can be activated through:
+```
+rcctl set goshd flags -max-filesize 64MiB -max-lifetime 3d -contact gosh-abuse@example.org
+rcctl enable goshd
+rcctl start goshd
+```
+
+Your `/etc/httpd.conf` should contain a `server` block like the following one:
+```
+server "example.org" {
+  listen on * tls port 443
+  tls {
+    certificate "/etc/ssl/example.org.crt"
+    key "/etc/ssl/private/example.org.key"
+  }
+
+  connection max request body 67108864  # 64M
+
+  location "/.well-known/acme-challenge/*" {
+    root "/acme"
+    request strip 2
+  }
+  location "/*" {
+    fastcgi socket "/run/gosh.sock"
+  }
+}
+```
+
+Don't forget to `rcctl reload httpd` your configuration changes.
 
 ## Commands
 ### goshd
