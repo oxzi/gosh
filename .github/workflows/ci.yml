@@ -27,3 +27,29 @@ jobs:
       with:
         skip-pkg-cache: true
         skip-build-cache: true
+
+
+  golang_cross:
+    name: Cross Compile
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go: [ '1.17', '1.19' ]
+        goos: [ 'freebsd', 'linux', 'openbsd', 'windows' ]
+
+    env:
+      GOOS: ${{ matrix.goos }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go }}
+
+    - run: go build ./...
+      env:
+        GOOS: ${{ matrix.goos }}
+        CGO_ENABLED: 0
