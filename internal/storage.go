@@ -57,6 +57,9 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 	opts.Dir = s.databaseDir()
 	opts.ValueDir = opts.Dir
 	opts.Logger = log.StandardLogger()
+	opts.Options.BaseLevelSize = 1 << 21    // 2MiB
+	opts.Options.ValueLogFileSize = 1 << 24 // 16MiB
+	opts.Options.BaseTableSize = 1 << 20    // 1MiB
 
 	if s.bh, err = badgerhold.Open(opts); err != nil {
 		return
