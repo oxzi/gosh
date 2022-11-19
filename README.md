@@ -7,7 +7,7 @@ All files have a maximum lifetime and are then deleted.
 ## Features
 
 - Standalone HTTP web server, no additional server needed (might be proxied for HTTPS)
-- Supports a FastCGI server over HTTP if `--listen fcgi:/path/to.sock`
+- Supports a FastCGI server instead of HTTP if `--listen fcgi:/path/to.sock`
 - Store with both files and some metadata
 - Only safe uploader's IP address for legal reasons, anonymous download
 - File and all metadata are automatically deleted after expiration
@@ -20,6 +20,7 @@ All files have a maximum lifetime and are then deleted.
 - Burn after Reading: uploads can be deleted after the first download
 - Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
 - On Linux there is additional hardening through Landlock and seccomp-bpf
+- On OpenBSD there is additional hardening through pledge and unveil
 
 
 ## Installation
@@ -221,11 +222,11 @@ With the `-b` or `--burn` flags you may decide to burn the file after reading.
 
 ## Related Work
 
-There is also [darn](https://github.com/CryptoCopter/darn), a gosh fork which enables server-side file encryption.
-Back in time, this code was merged into gosh.
-However, for the sake of simplicity and because I don't like to trust a server, this has been removed again.
-
 Of course, there are already similar projects, for example:
 
-- [0x0](https://github.com/lachs0r/0x0)
+- [0x0](https://git.0x0.st/mia/0x0)
 - [Pomf](https://github.com/pomf/pomf)
+
+There is also [darn](https://github.com/CryptoCopter/darn), a gosh fork which enables server-side file encryption.
+Back in time, this code was merged into gosh.
+However, for the sake of simplicity and because I don't like to trust a remote server, this has been removed again.
