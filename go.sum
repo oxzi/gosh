@@ -99,6 +99,8 @@ github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrk
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/oxzi/syscallset-go v0.1.0 h1:R5IHPn4mP1JXDdzTEHKUOd33C9Npzkdkr+Nhf3oa/lM=
 github.com/oxzi/syscallset-go v0.1.0/go.mod h1:u7922uefH6CDY3eG/YUpVwdCLDP9p9pXttX3LS1UMa8=
+github.com/oxzi/syscallset-go v0.1.2 h1:KDcXp0CCx4z2DC3kT+q/BeED2AHRwmHUMv78w32v0uk=
+github.com/oxzi/syscallset-go v0.1.2/go.mod h1:u7922uefH6CDY3eG/YUpVwdCLDP9p9pXttX3LS1UMa8=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
