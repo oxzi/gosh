@@ -4,11 +4,11 @@ go 1.17
 
 require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
-	github.com/landlock-lsm/go-landlock v0.0.0-20220817183506-323ae58cdb2f
+	github.com/landlock-lsm/go-landlock v0.0.0-20221114184819-4ed765d30e70
 	github.com/oxzi/syscallset-go v0.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/timshannon/badgerhold/v4 v4.0.2
-	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec
+	golang.org/x/sys v0.1.0
 )
 
 require (
