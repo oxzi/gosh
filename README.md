@@ -21,7 +21,7 @@ All files have a maximum lifetime and are then deleted.
 - Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
 - On Linux there is additional hardening through Landlock and seccomp-bpf
 - On OpenBSD there is additional hardening through pledge and unveil
-- Print less output with `?onlyURL` flag, e.g. for use with Weechat-Android.
+- Print only the final UR with the `?onlyURL` GET parameter instead of a more verbose output
 
 
 ## Installation
@@ -213,7 +213,7 @@ curl -F 'file=@foo.png' -F 'time=1d' -F 'burn=1' http://our-server.example/
 curl -F 'file=@foo.png' http://our-server.example/?onlyURL
 ```
 
-For use with the [Weechat-Android relay client](https://github.com/ubergeek42/weechat-android), simply add the `?onlyURL` flag to the domain and enter in the settings with no further changes.
+For use with the [Weechat-Android relay client](https://github.com/ubergeek42/weechat-android), simply add the `?onlyURL` GET parameter to the URL and enter in the settings under file sharing with no further changes.
 
 ## Shell function
 
