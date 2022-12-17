@@ -96,6 +96,8 @@ github.com/landlock-lsm/go-landlock v0.0.0-20220817183506-323ae58cdb2f h1:hy8Lae
 github.com/landlock-lsm/go-landlock v0.0.0-20220817183506-323ae58cdb2f/go.mod h1:pvQOStHTxYHPZVAXTNqWH8TgE76OUMfKhbJP2RRovog=
 github.com/landlock-lsm/go-landlock v0.0.0-20221114184819-4ed765d30e70 h1:xA5ZdpyH+ex1JkO3GgkTvSthNbOrtG2fV6MHlBzLGlk=
 github.com/landlock-lsm/go-landlock v0.0.0-20221114184819-4ed765d30e70/go.mod h1:oCxtVqzP6dNPgAQK+4okeQk9BcxjkttF8MG4DmoT6Sk=
+github.com/landlock-lsm/go-landlock v0.0.0-20221217100533-f0382d142170 h1:cNyB2FSxqXoMUmdq+3kny6uRVVb3ej7PxvRCIFaReJE=
+github.com/landlock-lsm/go-landlock v0.0.0-20221217100533-f0382d142170/go.mod h1:oCxtVqzP6dNPgAQK+4okeQk9BcxjkttF8MG4DmoT6Sk=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
