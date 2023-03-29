@@ -108,13 +108,13 @@ const indexTpl = `<!DOCTYPE html>
 
 		<pre>$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
 
-		Set a custom expiry date, e.g., one minute:
+		Set a custom expiry period, e.g., one minute:
 
-		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'period=1m' {{.Proto}}://{{.Hostname}}/</pre>
 
 		Or all together:
 
-		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'period=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
 
 		Print only URL as response:
 
@@ -131,10 +131,10 @@ const indexTpl = `<!DOCTYPE html>
 				<input type="file" name="file" />
 				<label for="burn">Burn after reading:</label>
 				<input type="checkbox" name="burn" value="1" />
-				<label for="time">Optionally, set a custom expiry date:</label>
+				<label for="period">Optionally, set a custom expiry period:</label>
 				<input
 					type="text"
-					name="time"
+					name="period"
 					pattern="{{.DurationPattern}}"
 					title="A duration string is sequence of decimal numbers, each with a unit suffix. Valid time units in order are 'y', 'mo', 'w', 'd', 'h', 'm', 's'"
 				/>

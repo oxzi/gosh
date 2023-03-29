@@ -203,7 +203,7 @@ curl -F 'file=@foo.png' http://our-server.example/
 # Burn after reading:
 curl -F 'file=@foo.png' -F 'burn=1' http://our-server.example/
 
-# Set a custom expiry date, e.g., one day:
+# Set a custom expiry period, e.g., one day:
 curl -F 'file=@foo.png' -F 'time=1d' http://our-server.example/
 
 # Or all together:

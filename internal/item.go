@@ -18,7 +18,7 @@ import (
 const (
 	formFile             string = "file"
 	formBurnAfterReading string = "burn"
-	formLifetime         string = "time"
+	formLifetime         string = "period"
 )
 
 // OwnerType describes a possible type of an owner, as an IP address. This can
