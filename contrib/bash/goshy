@@ -23,9 +23,6 @@ if [ -z $PERIOD_IS_SET ]; then
   PERIOD='3d'
 fi
 
- \
- \
-
 while :; do
   case "$1" in
     -p|--period)
