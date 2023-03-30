@@ -21,7 +21,7 @@ All files have a maximum lifetime and are then deleted.
 - Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
 - On Linux there is additional hardening through Landlock and seccomp-bpf
 - On OpenBSD there is additional hardening through pledge and unveil
-- Print only the final UR with the `?onlyURL` GET parameter instead of a more verbose output
+- Print only the final URL with the `?onlyURL` GET parameter instead of a more verbose output
 - Configurable URL prefix, e.g., host under `http://example.org/gosh/`.
 
 

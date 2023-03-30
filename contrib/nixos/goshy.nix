@@ -11,7 +11,7 @@ let
     Options:
       -b --burn              Burn after reading.
       -h --help              Print this help message.
-      -u --only--url         Print only URL as response.
+      -u --only-url          Print only URL as response.
       -p --period TIMEFRAME  Set a custom expiry period.
     EOF
     }
