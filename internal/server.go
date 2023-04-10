@@ -207,7 +207,9 @@ func (serv *Server) Close() error {
 
 func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, reqPath, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
-	if reqPath == "/" {
+	if reqPath == "" {
+		http.RedirectHandler(serv.urlPrefix+"/", http.StatusTemporaryRedirect).ServeHTTP(w, r)
+	} else if reqPath == "/" {
 		serv.handleRoot(w, r)
 	} else if strings.HasPrefix(reqPath, "/del/") {
 		serv.handleDeletion(w, r)
