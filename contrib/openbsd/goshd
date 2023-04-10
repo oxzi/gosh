@@ -8,7 +8,7 @@ pexp="${daemon}.*"
 rc_reload=NO
 
 rc_start() {
-  ${rcexec} "${daemon} -user www -fcgi -listen /var/www/run/gosh.sock -store /var/www/htdocs/example.org -mimemap /var/www/htdocs/example.org/mimemap ${daemon_flags} >> /var/www/logs/goshd.log 2>&1 &"
+  rc_exec "${daemon} -user www -fcgi -listen /var/www/run/gosh.sock -store /var/www/htdocs/example.org -mimemap /var/www/htdocs/example.org/mimemap ${daemon_flags} >> /var/www/logs/goshd.log 2>&1 &"
 }
 
 rc_cmd $1
