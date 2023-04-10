@@ -20,6 +20,7 @@ var (
 	maxLifetime time.Duration
 	contactMail string
 	mimeMap     internal.MimeMap
+	urlPrefix   string
 	fcgiServer  bool
 	socketFd    *os.File
 )
@@ -42,6 +43,7 @@ func init() {
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
 	flag.StringVar(&mimeMapStr, "mimemap", "", "MimeMap to substitute/drop MIMEs")
 	flag.StringVar(&listenAddr, "listen", ":8080", "Either a TCP listen address or an Unix domain socket")
+	flag.StringVar(&urlPrefix, "url-prefix", "", "Prefix in URL to be used, e.g., /gosh")
 	flag.BoolVar(&fcgiServer, "fcgi", false, "Serve a FastCGI server instead of a HTTP server")
 	flag.StringVar(&user, "user", "", "User to drop privileges to, also create a chroot - requires root permissions")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
@@ -133,7 +135,7 @@ func serveHttpd(server *internal.Server) {
 }
 
 func main() {
-	server, err := internal.NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap)
+	server, err := internal.NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}

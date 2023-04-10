@@ -22,6 +22,7 @@ All files have a maximum lifetime and are then deleted.
 - On Linux there is additional hardening through Landlock and seccomp-bpf
 - On OpenBSD there is additional hardening through pledge and unveil
 - Print only the final UR with the `?onlyURL` GET parameter instead of a more verbose output
+- Configurable URL prefix, e.g., host under `http://example.org/gosh/`.
 
 
 ## Installation
@@ -125,20 +126,40 @@ Don't forget to `rcctl reload httpd` your configuration changes.
 
 ```
 Usage of ./goshd:
+  -alsologtostderr
+        log to standard error as well as files
   -contact string
         Contact E-Mail for abuses
+  -fcgi
+        Serve a FastCGI server instead of a HTTP server
   -listen string
-        Listen address for the HTTP server (default ":8080")
+        Either a TCP listen address or an Unix domain socket (default ":8080")
+  -log_backtrace_at value
+        when logging hits line file:N, emit a stack trace
+  -log_dir string
+        If non-empty, write log files in this directory
+  -logtostderr
+        log to standard error instead of files
   -max-filesize string
         Maximum file size in bytes (default "10MiB")
   -max-lifetime string
         Maximum lifetime (default "24h")
   -mimemap string
         MimeMap to substitute/drop MIMEs
+  -stderrthreshold value
+        logs at or above this threshold go to stderr
   -store string
         Path to the store
+  -url-prefix string
+        Prefix in URL to be used, e.g., /gosh
+  -user string
+        User to drop privileges to, also create a chroot - requires root permissions
+  -v value
+        log level for V logs
   -verbose
         Verbose logging
+  -vmodule value
+        comma-separated list of pattern=N settings for file-filtered logging
 ```
 
 An example usage could look like this.

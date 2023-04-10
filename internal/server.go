@@ -102,28 +102,28 @@ const indexTpl = `<!DOCTYPE html>
 
 		HTTP POST your file:
 
-		<pre>$ curl -F 'file=@foo.png' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' {{.Proto}}://{{.Hostname}}{{.Prefix}}/</pre>
 
 		Burn after reading:
 
-		<pre>$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'burn=1' {{.Proto}}://{{.Hostname}}{{.Prefix}}/</pre>
 
 		Set a custom expiry date, e.g., one minute:
 
-		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' {{.Proto}}://{{.Hostname}}{{.Prefix}}/</pre>
 
 		Or all together:
 
-		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}/</pre>
+		<pre>$ curl -F 'file=@foo.png' -F 'time=1m' -F 'burn=1' {{.Proto}}://{{.Hostname}}{{.Prefix}}/</pre>
 
 		Print only URL as response:
 
-		<pre>$ curl -F 'file=@foo.png' -F {{.Proto}}://{{.Hostname}}/?onlyURL</pre>
+		<pre>$ curl -F 'file=@foo.png' -F {{.Proto}}://{{.Hostname}}{{.Prefix}}/?onlyURL</pre>
 
 		<h3>### form</h3>
 
 		<form
-			action="{{.Proto}}://{{.Hostname}}/"
+			action="{{.Proto}}://{{.Hostname}}{{.Prefix}}/"
 			method="POST"
 			enctype="multipart/form-data">
 			<div id="grid">
@@ -176,12 +176,13 @@ type Server struct {
 	maxLifetime time.Duration
 	contactMail string
 	mimeMap     MimeMap
+	urlPrefix   string
 }
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
 func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
-	contactMail string, mimeMap MimeMap) (s *Server, err error) {
+	contactMail string, mimeMap MimeMap, urlPrefix string) (s *Server, err error) {
 	store, storeErr := NewStore(storeDirectory, true)
 	if storeErr != nil {
 		err = storeErr
@@ -194,6 +195,7 @@ func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
 		maxLifetime: maxLifetime,
 		contactMail: contactMail,
 		mimeMap:     mimeMap,
+		urlPrefix:   urlPrefix,
 	}
 	return
 }
@@ -204,7 +206,7 @@ func (serv *Server) Close() error {
 }
 
 func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	reqPath := r.URL.Path
+	_, reqPath, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
 	if reqPath == "/" {
 		serv.handleRoot(w, r)
 	} else if strings.HasPrefix(reqPath, "/del/") {
@@ -243,6 +245,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Size            string
 		Proto           string
 		Hostname        string
+		Prefix          string
 		EMail           string
 		DurationPattern string
 	}{
@@ -250,6 +253,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Size:            PrettyBytesize(serv.maxSize),
 		Proto:           WebProtocol(r),
 		Hostname:        r.Host,
+		Prefix:          serv.urlPrefix,
 		EMail:           serv.contactMail,
 		DurationPattern: getHtmlDurationPattern(),
 	}
@@ -301,7 +305,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
-	baseUrl := fmt.Sprintf("%s://%s", WebProtocol(r), r.Host)
+	baseUrl := fmt.Sprintf("%s://%s%s", WebProtocol(r), r.Host, serv.urlPrefix)
 	onlyUrl := r.URL.Query().Has("onlyURL")
 
 	if onlyUrl {
@@ -362,7 +366,8 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqId := strings.TrimLeft(r.URL.Path, "/")
+	_, reqId, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
+	reqId = strings.TrimLeft(reqId, "/")
 
 	item, err := serv.store.Get(reqId, true)
 	if err == ErrNotFound {
@@ -408,7 +413,10 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
+	_, reqId, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
+	reqId = strings.TrimLeft(reqId, "/")
+	reqParts := strings.Split(reqId, "/")
+
 	if len(reqParts) != 3 {
 		log.WithField("request", reqParts).Debug("Requested URL is malformed")
 
