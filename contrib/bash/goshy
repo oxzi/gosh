@@ -1,5 +1,5 @@
-#!/bin/bash
-set -x
+#!/usr/bin/env bash
+
 show_help() {
   cat <<EOF
 Usage: goshy [Options] FILE
@@ -11,31 +11,19 @@ Options:
 EOF
 }
 
-while getopts p:period: flag
-do
-  case "$\{flag\}" in
-    p) PERIOD_IS_SET=1;;
-    period) PERIOD_IS_SET=1;;
-  esac
-done > /dev/null 2>&1
-
-if [ -z $PERIOD_IS_SET ]; then
-  PERIOD='3d'
-fi
-
 while :; do
   case "$1" in
     -p|--period)
-      PERIOD=$2
+      PERIOD="-F time=$2"
       shift
       ;;
 
     -b|--burn)
-      BURN='-F burn=1'
+      BURN="-F burn=1"
       ;;
 
     -u|--only-url)
-      ONLYURL='?onlyURL'
+      ONLYURL="?onlyURL"
       ;;
 
     -h|--help)
@@ -51,11 +39,9 @@ while :; do
   shift
 done
 
-PERIOD="-F period=$PERIOD"
-
 if [[ -z "$1" ]]; then
   show_help
   exit 1
 fi
 
-curl $GOSH_INSTANCE/$ONLYURL -F "file=@$1" $PERIOD $BURN 
+curl "${GOSH_INSTANCE}/${ONLYURL}" -F "file=@${FILE}" $PERIOD $BURN
