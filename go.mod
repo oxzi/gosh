@@ -6,7 +6,7 @@ require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
 	github.com/landlock-lsm/go-landlock v0.0.0-20230225094210-7a98d7db83f2
 	github.com/oxzi/syscallset-go v0.1.4
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/timshannon/badgerhold/v4 v4.0.2
 	golang.org/x/sys v0.7.0
 )
