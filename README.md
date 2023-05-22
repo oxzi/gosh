@@ -21,7 +21,7 @@ All files have a maximum lifetime and are then deleted.
 - Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
 - On Linux there is additional hardening through Landlock and seccomp-bpf
 - On OpenBSD there is additional hardening through pledge and unveil
-- Print only the final UR with the `?onlyURL` GET parameter instead of a more verbose output
+- Print only the final URL with the `?onlyURL` GET parameter instead of a more verbose output
 - Configurable URL prefix, e.g., host under `http://example.org/gosh/`.
 
 
@@ -39,6 +39,8 @@ CGO_ENABLED=0 go build -gcflags="all=-N -l" ./cmd/gosh-query
 ```
 
 ### NixOS
+
+#### Server module
 
 On a NixOS system one can configure gosh as a module. Have look at the example in `contrib/nixos/`.
 
@@ -77,6 +79,29 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
 
         locations."/".proxyPass = "http://${config.services.gosh.listenAddress}/";
       };
+    };
+  };
+}
+```
+
+#### Program module
+
+On a NixOS system one can also configure goshy as a program. Have look at the example in `contrib/nixos/goshy.nix`.
+
+```nix
+# Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
+
+{ config, pkgs, ... }:
+{
+  imports = [ /path/to/contrib/nixos/goshy.nix ];  # TODO: copy or link the contrib/nixos/goshy.nix
+
+  programs.goshy = {
+    enable = true;
+    instance = "https://gosh.example.com";
+    defaults = {
+      burnAfterReading = true;
+      printOnlyUrl = false;
+      expiryPeriod = "161s";
     };
   };
 }
@@ -236,13 +261,21 @@ curl -F 'file=@foo.png' http://our-server.example/?onlyURL
 
 For use with the [Weechat-Android relay client](https://github.com/ubergeek42/weechat-android), simply add the `?onlyURL` GET parameter to the URL and enter in the settings under file sharing with no further changes.
 
-## Shell function
+## Shell functions and scripts
+
+A `fish` function and a `bash` script allow handily uploading a file to the server of your choice which need to be manually set.
+An own installation and deployment of `goshd` is not necessary to use tools.
+
+### Bash, `contrib/bash/`
+
+The bash script is feature complete compared to the possibilites provided by using `curl` or the web interface.
+To be able to use the script, add `goshy` to your PATH, make it executable and set the `GOSH_INSTANCE` environment variable.
+For learning the usage run `goshy -h`.
 
 ### Fish, `contrib/fish/`
 
-A `fish`-function allow to easily upload a file to the server of your choice which needs to manually edited.
-With the `-b` or `--burn` flags you may decide to burn the file after reading.
-
+The fish function only provides the capability to upload a file and a flag for burn after reading.
+To be able to use the function, copy it's content to `~/.config/fish/config.fish`.
 
 ## Related Work
 

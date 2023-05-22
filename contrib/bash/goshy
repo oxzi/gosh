@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+show_help() {
+  cat <<EOF
+Usage: goshy [Options] FILE
+Options:
+  -b --burn              Burn after reading.
+  -h --help              Print this help message.
+  -i --instance          Complete URL to the gosh instance.
+  -p --period TIMEFRAME  Set a custom expiry period.
+  -u --only-url          Print only URL as response.
+EOF
+}
+
+while :; do
+  case "$1" in
+    -b|--burn)
+      BURN="1"
+      ;;
+
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+
+    -i|--instance)
+      GOSH_INSTANCE="$2"
+      shift
+      ;;
+
+    -p|--period)
+      PERIOD="$2"
+      shift
+      ;;
+
+    -u|--only-url)
+      ONLYURL="1"
+      ;;
+
+    *)
+      FILE=$1
+      break
+  esac
+
+  shift
+done
+
+if [ -z "$1" ]; then
+  show_help
+  exit 1
+fi
+
+if [ -z "$GOSH_INSTANCE" ]; then
+  echo "goshy: no gosh instance is configured"
+  exit 1
+fi
+
+CURL_CMD="curl -F 'file=@${FILE}'"
+if [[ -n ${BURN+x} ]]; then
+  CURL_CMD="${CURL_CMD} -F 'burn=1'"
+fi
+if [[ -n ${PERIOD+x} ]]; then
+  CURL_CMD="${CURL_CMD} -F 'time=${PERIOD}'"
+fi
+CURL_CMD="${CURL_CMD} ${GOSH_INSTANCE}"
+if [[ -n ${ONLYURL+x} ]]; then
+  CURL_CMD="${CURL_CMD}/?onlyURL"
+fi
+
+eval "$CURL_CMD"
