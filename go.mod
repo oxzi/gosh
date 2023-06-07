@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
-	github.com/landlock-lsm/go-landlock v0.0.0-20230225094210-7a98d7db83f2
+	github.com/landlock-lsm/go-landlock v0.0.0-20230607164353-b03374193cb2
 	github.com/oxzi/syscallset-go v0.1.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/timshannon/badgerhold/v4 v4.0.2
