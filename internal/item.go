@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"time"
@@ -38,27 +37,30 @@ var ownerHeaders = []OwnerType{Forwarded, XForwardedFor}
 func NewOwnerTypes(r *http.Request) (owners map[OwnerType]net.IP, err error) {
 	owners = make(map[OwnerType]net.IP)
 
-	// RemoteAddr
+	// First, extract the RemoteAddr.
 	if remoteAddr, _, raErr := net.SplitHostPort(r.RemoteAddr); raErr != nil {
 		err = raErr
 		return
 	} else if remoteAddrIp := net.ParseIP(remoteAddr); remoteAddrIp == nil {
-		err = fmt.Errorf("Failed to parse the remote IP %q", remoteAddr)
+		err = fmt.Errorf("cannot parse remote IP %q", remoteAddr)
 		return
 	} else {
 		owners[RemoteAddr] = remoteAddrIp
 	}
 
-	// Header
+	// Then, check f.e. additional IP address indicating header.
 	for _, headerKey := range ownerHeaders {
-		if headerVal := r.Header.Get(string(headerKey)); headerVal != "" {
-			if headerIp := net.ParseIP(headerVal); headerIp == nil {
-				err = fmt.Errorf("Failed to parse an IP for %q from %q", headerKey, headerVal)
-				return
-			} else {
-				owners[headerKey] = headerIp
-			}
+		headerVal := r.Header.Get(string(headerKey))
+		if headerVal == "" {
+			continue
 		}
+
+		headerIp := net.ParseIP(headerVal)
+		if headerIp == nil {
+			err = fmt.Errorf("cannot parse remote IP %q from header %q", headerVal, headerKey)
+			return
+		}
+		owners[headerKey] = headerIp
 	}
 
 	return
@@ -89,10 +91,14 @@ var (
 	filenamePattern = regexp.MustCompile(`[^0-9A-Za-z-_.]`)
 )
 
-// NewItem creates a new Item based on a Request. The ID will be left empty.
-// Furthermore, if no error has occurred, a file is returned from which the
-// file content should be read. This file must be closed afterwards.
-func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item Item, file io.ReadCloser, err error) {
+// NewItemFromRequest creates a new Item based on a Request.
+//
+// The ID will be left empty. Furthermore, if no error has occurred, a file
+// like io.ReadCloser is returned from which the file's content must be read.
+// This file must be closed afterwards.
+//
+// Note, this Item must be passed to the Store to be safed and get an ID.
+func NewItemFromRequest(r *http.Request, maxSize int64, maxLifetime time.Duration) (item Item, file io.ReadCloser, err error) {
 	err = r.ParseMultipartForm(maxSize)
 	if err != nil {
 		return
@@ -105,6 +111,7 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 
 	defer func() {
 		if err != nil {
+			item = Item{}
 			file.Close()
 			file = nil
 		}
@@ -113,17 +120,18 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	if fileHeader.Size > maxSize {
 		err = ErrFileTooBig
 		return
-	} else if fileHeader.Size <= 0 {
-		err = fmt.Errorf("File size is zero")
+	}
+	if fileHeader.Size <= 0 {
+		err = errors.New("file size is zero")
 		return
 	}
 
 	delKeyBuff := make([]byte, 24)
-	if _, err = rand.Read(delKeyBuff); err != nil {
+	_, err = rand.Read(delKeyBuff)
+	if err != nil {
 		return
-	} else {
-		item.DeletionKey = string(base58.Encode(delKeyBuff))
 	}
+	item.DeletionKey = string(base58.Encode(delKeyBuff))
 
 	if burnAfterReading := r.FormValue(formBurnAfterReading); burnAfterReading == "1" {
 		item.BurnAfterReading = true
@@ -132,11 +140,10 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 	item.Filename = filenamePattern.ReplaceAllString(
 		filepath.Base(filepath.Clean(fileHeader.Filename)), "_")
 
-	if contentType := fileHeader.Header.Get("Content-Type"); contentType == "" {
-		err = fmt.Errorf("Failed to get a Content-Type from file header")
+	item.ContentType = fileHeader.Header.Get("Content-Type")
+	if item.ContentType == "" {
+		err = errors.New("missing Content-Type in file header")
 		return
-	} else {
-		item.ContentType = contentType
 	}
 
 	item.Created = time.Now().UTC()
@@ -153,41 +160,10 @@ func NewItem(r *http.Request, maxSize int64, maxLifetime time.Duration) (item It
 		item.Expires = item.Created.Add(parseLt)
 	}
 
-	if item.Owner, err = NewOwnerTypes(r); err != nil {
+	item.Owner, err = NewOwnerTypes(r)
+	if err != nil {
 		return
 	}
 
 	return
-}
-
-// targetFile returns the path to the Item's file.
-func (i Item) targetFile(directory string) string {
-	return filepath.Join(directory, i.ID)
-}
-
-// WriteFile serializes the file of an Item in the given directory. The file
-// name will be the ID of the Item.
-func (i Item) WriteFile(file io.ReadCloser, directory string) error {
-	f, err := os.Create(i.targetFile(directory))
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-
-	if _, err := io.Copy(f, file); err != nil {
-		return err
-	}
-
-	return file.Close()
-}
-
-// ReadFile deserializes the file of an Item from the given directory into a ReadCloser.
-func (i Item) ReadFile(directory string) (io.ReadCloser, error) {
-	return os.Open(i.targetFile(directory))
-}
-
-// DeleteFile removes the file of an Item from the given directory.
-func (i Item) DeleteFile(directory string) error {
-	return os.Remove(i.targetFile(directory))
 }

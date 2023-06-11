@@ -7,7 +7,6 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -133,7 +132,7 @@ func TestItem(t *testing.T) {
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			r.RemoteAddr = "[fe80::42]:2342"
 
-			i, f, err := NewItem(r, maxFilesize, time.Hour)
+			i, f, err := NewItemFromRequest(r, maxFilesize, time.Hour)
 			if (err == nil) != test.valid {
 				t.Fatalf("Is valid: %t, error: %v", test.valid, err)
 			}
@@ -162,25 +161,6 @@ func TestItem(t *testing.T) {
 				if iDur := i.Expires.Sub(i.Created); iDur != time.Hour {
 					t.Fatalf("Expected duration of %v, got %v", time.Hour, iDur)
 				}
-			}
-
-			if itemDir, err := os.MkdirTemp("", ""); err != nil {
-				t.Fatal(err)
-			} else {
-				if err := i.WriteFile(f, itemDir); err != nil {
-					t.Fatal(err)
-				}
-
-				if file, err := i.ReadFile(itemDir); err != nil {
-					t.Fatal(err)
-				} else if data, err := io.ReadAll(file); err != nil {
-					t.Fatal(err)
-				} else if !reflect.DeepEqual(tmpFileData, data) {
-					t.Fatalf("Data mismatches; got something of length %d and expected %d",
-						len(data), len(tmpFileData))
-				}
-
-				os.RemoveAll(itemDir)
 			}
 
 			if err := f.Close(); err != nil {

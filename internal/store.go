@@ -45,11 +45,15 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 	log.WithField("directory", baseDir).Info("Opening Store")
 
 	for _, dir := range []string{baseDir, s.databaseDir(), s.storageDir()} {
-		if _, stat := os.Stat(dir); os.IsNotExist(stat) {
-			if err = os.Mkdir(dir, 0700); err != nil {
-				log.WithError(err).Error("Cannot create directory")
-				return
-			}
+		_, stat := os.Stat(dir)
+		if !os.IsNotExist(stat) {
+			continue
+		}
+
+		err = os.Mkdir(dir, 0700)
+		if err != nil {
+			log.WithField("directory", dir).WithError(err).Error("Cannot create directory")
+			return
 		}
 	}
 
@@ -61,7 +65,8 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 	opts.Options.ValueLogFileSize = 1 << 24 // 16MiB
 	opts.Options.BaseTableSize = 1 << 20    // 1MiB
 
-	if s.bh, err = badgerhold.Open(opts); err != nil {
+	s.bh, err = badgerhold.Open(opts)
+	if err != nil {
 		return
 	}
 
@@ -118,10 +123,18 @@ func (s *Store) createID() (id string, err error) {
 
 		id = string(base58.Encode(idBuff))
 
-		if err = s.bh.Get(id, Item{}); err == badgerhold.ErrNotFound {
-			err = nil
+		switch bhErr := s.bh.Get(id, Item{}); bhErr {
+		case nil:
+			// Continue if this ID is already in use
+			continue
+
+		case badgerhold.ErrNotFound:
+			// Use this ID if there is no such entry
 			return
-		} else if err != nil {
+
+		default:
+			// Otherwise, pass error along
+			err = bhErr
 			return
 		}
 	}
@@ -150,16 +163,22 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 	if err == badgerhold.ErrNotFound {
 		log.WithField("ID", id).Debug("Requested Item was not found")
 		err = ErrNotFound
+		return
 	} else if err != nil {
 		log.WithField("ID", id).WithError(err).Error("Requested Item failed")
-	} else if err == nil && delExpired && i.Expires.Before(time.Now()) {
+		return
+	}
+
+	if delExpired && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
 			"expires": i.Expires,
 		}).Info("Requested Item is expired, will be deleted")
 
-		if err := s.Delete(i); err != nil {
+		err = s.Delete(i.ID)
+		if err != nil {
 			log.WithError(err).WithField("ID", id).Error("Deletion of expired Item failed")
+			return
 		}
 
 		err = ErrNotFound
@@ -168,12 +187,15 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 	return
 }
 
-// GetFile creates a ReadCloser to the Item's file.
-func (s *Store) GetFile(i Item) (io.ReadCloser, error) {
-	return i.ReadFile(s.storageDir())
+// GetFile creates a ReadCloser for a stored Item file by this ID.
+func (s *Store) GetFile(id string) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(s.storageDir(), id))
 }
 
-// Put a new Item inside the Store. Both a database entry and a file will be created.
+// Put a new Item inside the Store.
+//
+// Both a database entry and a file will be created. The given file will be
+// read into the storage and closed afterwards.
 func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 	log.Debug("Requested insertion of Item into the Store")
 
@@ -192,9 +214,24 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 		return
 	}
 
-	err = i.WriteFile(file, s.storageDir())
+	f, err := os.Create(filepath.Join(s.storageDir(), i.ID))
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Error("Insertion of an Item into storage failed")
+		log.WithField("ID", i.ID).WithError(err).Error("Creation of file failed")
+		return
+	}
+
+	_, err = io.Copy(f, file)
+	if err != nil {
+		return
+	}
+
+	err = file.Close()
+	if err != nil {
+		return
+	}
+
+	err = f.Close()
+	if err != nil {
 		return
 	}
 
@@ -204,13 +241,15 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 // DeleteExpired checks the Store for expired Items and deletes them.
 func (s *Store) DeleteExpired() error {
 	var items []Item
-	if err := s.bh.Find(&items, badgerhold.Where("Expires").Lt(time.Now())); err != nil {
+	err := s.bh.Find(&items, badgerhold.Where("Expires").Lt(time.Now()))
+	if err != nil {
 		return err
 	}
 
 	for _, i := range items {
 		log.WithField("ID", i.ID).Debug("Delete expired Item")
-		if err := s.Delete(i); err != nil {
+		err := s.Delete(i.ID)
+		if err != nil {
 			return err
 		}
 	}
@@ -219,18 +258,18 @@ func (s *Store) DeleteExpired() error {
 }
 
 // Delte an Item. Both the database entry and the file will be removed.
-func (s *Store) Delete(i Item) (err error) {
-	log.WithField("ID", i.ID).Debug("Requested deletion of Item")
+func (s *Store) Delete(id string) (err error) {
+	log.WithField("ID", id).Debug("Requested deletion of Item")
 
-	err = s.bh.Delete(i.ID, i)
+	err = s.bh.Delete(&id, Item{})
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Error("Deletion of Item from database failed")
+		log.WithField("ID", id).WithError(err).Error("Deletion of Item from database failed")
 		return
 	}
 
-	err = i.DeleteFile(s.storageDir())
+	err = os.Remove(filepath.Join(s.storageDir(), id))
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Error("Deletion of Item from storage failed")
+		log.WithField("ID", id).WithError(err).Error("Deletion of Item from storage failed")
 		return
 	}
 

@@ -269,7 +269,7 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	item, f, err := NewItem(r, serv.maxSize, serv.maxLifetime)
+	item, f, err := NewItemFromRequest(r, serv.maxSize, serv.maxLifetime)
 	if err == ErrLifetimeTooLong {
 		log.Info("New Item with a too long lifetime was rejected")
 
@@ -333,7 +333,7 @@ func (serv *Server) hasClientCachedRequest(r *http.Request, item Item) bool {
 
 // handleRequestServe is called from handleRequest when a valid Item should be served.
 func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, item Item) error {
-	f, err := serv.store.GetFile(item)
+	f, err := serv.store.GetFile(item.ID)
 	if err != nil {
 		return fmt.Errorf("reading file failed: %v", err)
 	}
@@ -401,7 +401,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if item.BurnAfterReading {
 		log.WithField("ID", item.ID).Info("Item will be burned")
-		if err := serv.store.Delete(item); err != nil {
+		if err := serv.store.Delete(item.ID); err != nil {
 			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 		}
 	}
@@ -448,7 +448,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := serv.store.Delete(item); err != nil {
+	if err := serv.store.Delete(item.ID); err != nil {
 		log.WithError(err).WithField("ID", reqId).Error("Requested deletion failed")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)

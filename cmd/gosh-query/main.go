@@ -110,7 +110,7 @@ func main() {
 		for _, item := range items {
 			log.WithField("ID", item.ID).Info("Deleting Item")
 
-			if err := store.Delete(item); err != nil {
+			if err := store.Delete(item.ID); err != nil {
 				log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 			}
 		}

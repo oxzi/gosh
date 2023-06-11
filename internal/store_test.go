@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -31,7 +32,8 @@ func TestStore(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	item := Item{Expires: time.Now().Add(time.Minute).UTC()}
-	itemData := newDummyReadCloser(bytes.NewBuffer([]byte("hello world")))
+	itemDataRaw := []byte("hello world")
+	itemData := newDummyReadCloser(bytes.NewBuffer(itemDataRaw))
 
 	storageDir, err := os.MkdirTemp("", "db")
 	if err != nil {
@@ -60,7 +62,23 @@ func TestStore(t *testing.T) {
 		t.Fatalf("Fetched Item mismatches: got %v and expected %v", itemX, item)
 	}
 
-	if err := store.Delete(item); err != nil {
+	if f, err := store.GetFile(itemId); err != nil {
+		t.Fatal(err)
+	} else {
+		buff := make([]byte, len(itemDataRaw))
+		n, err := io.ReadFull(f, buff)
+		if err != nil {
+			t.Fatal(n, err)
+		}
+		f.Close()
+		buff = buff[:n]
+
+		if !bytes.Equal(itemDataRaw, buff) {
+			t.Fatalf("Store data mismatch: %v != %v", itemDataRaw, buff)
+		}
+	}
+
+	if err := store.Delete(item.ID); err != nil {
 		t.Fatal(err)
 	} else if _, err := store.Get(item.ID, true); err != ErrNotFound {
 		t.Fatal(err)
