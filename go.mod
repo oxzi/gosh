@@ -8,7 +8,7 @@ require (
 	github.com/oxzi/syscallset-go v0.1.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/timshannon/badgerhold/v4 v4.0.2
-	golang.org/x/sys v0.8.0
+	golang.org/x/sys v0.9.0
 )
 
 require (
