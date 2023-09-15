@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
 	github.com/landlock-lsm/go-landlock v0.0.0-20230607164353-b03374193cb2
-	github.com/oxzi/syscallset-go v0.1.4
+	github.com/oxzi/syscallset-go v0.1.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/timshannon/badgerhold/v4 v4.0.2
 	golang.org/x/sys v0.12.0
@@ -27,7 +27,7 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.66 // indirect
 )
