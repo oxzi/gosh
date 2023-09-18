@@ -46,7 +46,7 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := store.Get("whatever", true); err != ErrNotFound {
+	if _, err := store.Get("whatever"); err != ErrNotFound {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestStore(t *testing.T) {
 	}
 	item.ID = itemId
 
-	if itemX, err := store.Get(itemId, true); err != nil {
+	if itemX, err := store.Get(itemId); err != nil {
 		t.Fatal(err)
 	} else if !reflect.DeepEqual(item, itemX) {
 		t.Fatalf("Fetched Item mismatches: got %v and expected %v", itemX, item)
@@ -80,7 +80,7 @@ func TestStore(t *testing.T) {
 
 	if err := store.Delete(item.ID); err != nil {
 		t.Fatal(err)
-	} else if _, err := store.Get(item.ID, true); err != ErrNotFound {
+	} else if _, err := store.Get(item.ID); err != ErrNotFound {
 		t.Fatal(err)
 	}
 
@@ -91,7 +91,7 @@ func TestStore(t *testing.T) {
 
 	if err := store.DeleteExpired(); err != nil {
 		t.Fatal(err)
-	} else if _, err := store.Get(item.ID, true); err != ErrNotFound {
+	} else if _, err := store.Get(item.ID); err != ErrNotFound {
 		t.Fatal(err)
 	}
 

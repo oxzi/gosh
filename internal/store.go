@@ -29,17 +29,19 @@ type Store struct {
 
 	bh *badgerhold.Store
 
-	hasCleanup bool
-	stopSyn    chan struct{}
-	stopAck    chan struct{}
+	cleanup bool
+	stopSyn chan struct{}
+	stopAck chan struct{}
 }
 
-// NewStore opens or initializes a Store in the given directory. A background
-// task for continuous cleaning can be activated.
-func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
+// NewStore opens or initializes a Store in the given directory.
+//
+// autoCleanup specifies if both a background cleanup job will be launched as
+// well as deleting expired Items after being retrieved.
+func NewStore(baseDir string, autoCleanup bool) (s *Store, err error) {
 	s = &Store{
-		baseDir:    baseDir,
-		hasCleanup: backgroundCleanup,
+		baseDir: baseDir,
+		cleanup: autoCleanup,
 	}
 
 	log.WithField("directory", baseDir).Info("Opening Store")
@@ -70,7 +72,7 @@ func NewStore(baseDir string, backgroundCleanup bool) (s *Store, err error) {
 		return
 	}
 
-	if s.hasCleanup {
+	if s.cleanup {
 		s.stopSyn = make(chan struct{})
 		s.stopAck = make(chan struct{})
 
@@ -147,7 +149,7 @@ func (s *Store) createID() (id string, err error) {
 func (s *Store) Close() error {
 	log.Info("Closing Store")
 
-	if s.hasCleanup {
+	if s.cleanup {
 		close(s.stopSyn)
 		<-s.stopAck
 	}
@@ -156,7 +158,7 @@ func (s *Store) Close() error {
 }
 
 // Get an Item by its ID. The Item's file can be accessed with GetFile.
-func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
+func (s *Store) Get(id string) (i Item, err error) {
 	log.WithField("ID", id).Debug("Requested Item from Store")
 
 	err = s.bh.Get(id, &i)
@@ -169,7 +171,7 @@ func (s *Store) Get(id string, delExpired bool) (i Item, err error) {
 		return
 	}
 
-	if delExpired && i.Expires.Before(time.Now()) {
+	if s.cleanup && i.Expires.Before(time.Now()) {
 		log.WithFields(log.Fields{
 			"ID":      id,
 			"expires": i.Expires,

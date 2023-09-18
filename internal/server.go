@@ -371,7 +371,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	_, reqId, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
 	reqId = strings.TrimLeft(reqId, "/")
 
-	item, err := serv.store.Get(reqId, true)
+	item, err := serv.store.Get(reqId)
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
@@ -428,7 +428,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 
 	reqId, delKey := reqParts[1], reqParts[2]
 
-	item, err := serv.store.Get(reqId, true)
+	item, err := serv.store.Get(reqId)
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
