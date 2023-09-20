@@ -89,7 +89,7 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.DeleteExpired(); err != nil {
+	if err := store.deleteExpired(); err != nil {
 		t.Fatal(err)
 	} else if _, err := store.Get(item.ID); err != ErrNotFound {
 		t.Fatal(err)

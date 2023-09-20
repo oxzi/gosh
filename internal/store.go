@@ -104,7 +104,7 @@ func (s *Store) cleanupExired() {
 			return
 
 		case <-ticker.C:
-			if err := s.DeleteExpired(); err != nil {
+			if err := s.deleteExpired(); err != nil {
 				log.WithError(err).Error("Deletion of expired Items failed")
 			}
 		}
@@ -190,7 +190,7 @@ func (s *Store) Get(id string) (i Item, err error) {
 }
 
 // GetFile creates a ReadCloser for a stored Item file by this ID.
-func (s *Store) GetFile(id string) (io.ReadCloser, error) {
+func (s *Store) GetFile(id string) (*os.File, error) {
 	return os.Open(filepath.Join(s.storageDir(), id))
 }
 
@@ -240,8 +240,8 @@ func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
 	return
 }
 
-// DeleteExpired checks the Store for expired Items and deletes them.
-func (s *Store) DeleteExpired() error {
+// deleteExpired checks the Store for expired Items and deletes them.
+func (s *Store) deleteExpired() error {
 	var items []Item
 	err := s.bh.Find(&items, badgerhold.Where("Expires").Lt(time.Now()))
 	if err != nil {
