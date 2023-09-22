@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,7 +172,7 @@ const (
 
 // Server implements an http.Handler for up- and download.
 type Server struct {
-	store       *Store
+	store       *StoreRpcClient
 	maxSize     int64
 	maxLifetime time.Duration
 	contactMail string
@@ -181,14 +182,8 @@ type Server struct {
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
-func NewServer(storeDirectory string, maxSize int64, maxLifetime time.Duration,
+func NewServer(store *StoreRpcClient, maxSize int64, maxLifetime time.Duration,
 	contactMail string, mimeMap MimeMap, urlPrefix string) (s *Server, err error) {
-	store, storeErr := NewStore(storeDirectory, true)
-	if storeErr != nil {
-		err = storeErr
-		return
-	}
-
 	s = &Server{
 		store:       store,
 		maxSize:     maxSize,
@@ -292,7 +287,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	itemId, err := serv.store.Put(item, f)
+	itemId, err := serv.store.Put(item, f, context.Background())
 	if err != nil {
 		log.WithError(err).Error("Failed to store Item")
 
@@ -333,7 +328,7 @@ func (serv *Server) hasClientCachedRequest(r *http.Request, item Item) bool {
 
 // handleRequestServe is called from handleRequest when a valid Item should be served.
 func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, item Item) error {
-	f, err := serv.store.GetFile(item.ID)
+	f, err := serv.store.GetFile(item.ID, context.Background())
 	if err != nil {
 		return fmt.Errorf("reading file failed: %v", err)
 	}
@@ -371,7 +366,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	_, reqId, _ := strings.Cut(r.URL.Path, serv.urlPrefix)
 	reqId = strings.TrimLeft(reqId, "/")
 
-	item, err := serv.store.Get(reqId)
+	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
@@ -401,7 +396,7 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if item.BurnAfterReading {
 		log.WithField("ID", item.ID).Info("Item will be burned")
-		if err := serv.store.Delete(item.ID); err != nil {
+		if err := serv.store.Delete(item.ID, context.Background()); err != nil {
 			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
 		}
 	}
@@ -428,7 +423,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 
 	reqId, delKey := reqParts[1], reqParts[2]
 
-	item, err := serv.store.Get(reqId)
+	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
 		log.WithField("ID", reqId).Debug("Requested non-existing ID")
 
@@ -448,7 +443,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := serv.store.Delete(item.ID); err != nil {
+	if err := serv.store.Delete(item.ID, context.Background()); err != nil {
 		log.WithError(err).WithField("ID", reqId).Error("Requested deletion failed")
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)

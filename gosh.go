@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"net"
 	"net/http"
 	"net/http/fcgi"
 	"os"
+	"os/exec"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -50,10 +53,40 @@ func serveHttpd(server *Server) {
 	}
 }
 
+func mainStore(storePath string) {
+	log.WithField("store", storePath).Info("Starting store child")
+
+	store, err := NewStore(storePath, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rpcConn, err := UnixConnFromFile(os.NewFile(3, ""))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fdConn, err := UnixConnFromFile(os.NewFile(4, ""))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rpcStore := NewStoreRpcServer(store, rpcConn, fdConn)
+
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	<-sigint
+
+	err = rpcStore.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
 
 	var (
+		forkStore      bool
 		maxLifetimeStr string
 		maxFilesizeStr string
 		mimeMapStr     string
@@ -62,7 +95,10 @@ func main() {
 		verbose        bool
 	)
 
+	log.WithField("args", os.Args).Info("args")
+
 	flag.StringVar(&storePath, "store", "", "Path to the store")
+	flag.BoolVar(&forkStore, "fork-store", false, "Start the store sub")
 	flag.StringVar(&maxFilesizeStr, "max-filesize", "10MiB", "Maximum file size in bytes")
 	flag.StringVar(&maxLifetimeStr, "max-lifetime", "24h", "Maximum lifetime")
 	flag.StringVar(&contactMail, "contact", "", "Contact E-Mail for abuses")
@@ -77,6 +113,11 @@ func main() {
 
 	if verbose {
 		log.SetLevel(log.DebugLevel)
+	}
+
+	if forkStore {
+		mainStore(storePath)
+		return
 	}
 
 	if lt, err := ParseDuration(maxLifetimeStr); err != nil {
@@ -97,6 +138,56 @@ func main() {
 	if contactMail == "" {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
+
+	logParent, logStore, err := Socketpair()
+	if err != nil {
+		log.Fatal(err)
+	}
+	rpcParent, rpcStore, err := Socketpair()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fdParent, fdStore, err := Socketpair()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(logParent)
+		for scanner.Scan() {
+			log.Printf("[store] %s", scanner.Text())
+			if err := scanner.Err(); err != nil {
+				log.Printf("scanner failed: %v", err)
+			}
+		}
+	}()
+
+	cmd := &exec.Cmd{
+		Path: os.Args[0],
+		Args: append(os.Args, "-fork-store"),
+
+		Env: []string{},
+
+		Stdin:      nil,
+		Stdout:     logStore,
+		Stderr:     logStore,
+		ExtraFiles: []*os.File{rpcStore, fdStore},
+	}
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rpcConn, err := UnixConnFromFile(rpcParent)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fdConn, err := UnixConnFromFile(fdParent)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	storeClient := NewStoreRpcClient(rpcConn, fdConn)
 
 	hardeningOpts := &HardeningOpts{
 		StoreDir: &storePath,
@@ -131,7 +222,7 @@ func main() {
 		}
 	}
 
-	server, err := NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
+	server, err := NewServer(storeClient, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}
