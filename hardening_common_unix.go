@@ -3,7 +3,7 @@
 // This file contains some common code for multiple Unix platforms - or might it
 // be POSIX? I don't know. However, it should be feasible for BSDs and Linux.
 
-package internal
+package main
 
 import (
 	"net"

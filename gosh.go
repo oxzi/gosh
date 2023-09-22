@@ -10,8 +10,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/oxzi/gosh/internal"
 )
 
 var (
@@ -19,13 +17,40 @@ var (
 	maxFilesize int64
 	maxLifetime time.Duration
 	contactMail string
-	mimeMap     internal.MimeMap
+	mimeMap     MimeMap
 	urlPrefix   string
 	fcgiServer  bool
 	socketFd    *os.File
 )
 
-func init() {
+func serveFcgi(server *Server) {
+	ln, err := net.FileListener(socketFd)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot listen on socket")
+	}
+
+	log.Info("Starting FastCGI server")
+	if err := fcgi.Serve(ln, server); err != nil {
+		log.WithError(err).Fatal("FastCGI server failed")
+	}
+}
+
+func serveHttpd(server *Server) {
+	webServer := &http.Server{
+		Handler: server,
+	}
+	ln, err := net.FileListener(socketFd)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot listen on socket")
+	}
+
+	log.Info("Starting web server")
+	if err := webServer.Serve(ln); err != http.ErrServerClosed {
+		log.WithError(err).Fatal("Web server failed")
+	}
+}
+
+func main() {
 	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
 
 	var (
@@ -54,13 +79,13 @@ func init() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if lt, err := internal.ParseDuration(maxLifetimeStr); err != nil {
+	if lt, err := ParseDuration(maxLifetimeStr); err != nil {
 		log.WithError(err).Fatal("Failed to parse lifetime")
 	} else {
 		maxLifetime = lt
 	}
 
-	if bs, err := internal.ParseBytesize(maxFilesizeStr); err != nil {
+	if bs, err := ParseBytesize(maxFilesizeStr); err != nil {
 		log.WithError(err).Fatal("Failed to parse byte size")
 	} else {
 		maxFilesize = bs
@@ -73,7 +98,7 @@ func init() {
 		log.Fatal("Contact information must be set, see `--help`")
 	}
 
-	hardeningOpts := &internal.HardeningOpts{
+	hardeningOpts := &HardeningOpts{
 		StoreDir: &storePath,
 	}
 
@@ -94,48 +119,19 @@ func init() {
 	socketFd = hardeningOpts.ListenSocket
 
 	if mimeMapStr == "" {
-		mimeMap = make(internal.MimeMap)
+		mimeMap = make(MimeMap)
 	} else {
 		if f, err := os.Open(mimeMapStr); err != nil {
 			log.WithError(err).Fatal("Failed to open MimeMap")
-		} else if mm, err := internal.NewMimeMap(f); err != nil {
+		} else if mm, err := NewMimeMap(f); err != nil {
 			log.WithError(err).Fatal("Failed to parse MimeMap")
 		} else {
 			f.Close()
 			mimeMap = mm
 		}
 	}
-}
 
-func serveFcgi(server *internal.Server) {
-	ln, err := net.FileListener(socketFd)
-	if err != nil {
-		log.WithError(err).Fatal("Cannot listen on socket")
-	}
-
-	log.Info("Starting FastCGI server")
-	if err := fcgi.Serve(ln, server); err != nil {
-		log.WithError(err).Fatal("FastCGI server failed")
-	}
-}
-
-func serveHttpd(server *internal.Server) {
-	webServer := &http.Server{
-		Handler: server,
-	}
-	ln, err := net.FileListener(socketFd)
-	if err != nil {
-		log.WithError(err).Fatal("Cannot listen on socket")
-	}
-
-	log.Info("Starting web server")
-	if err := webServer.Serve(ln); err != http.ErrServerClosed {
-		log.WithError(err).Fatal("Web server failed")
-	}
-}
-
-func main() {
-	server, err := internal.NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
+	server, err := NewServer(storePath, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to start Store")
 	}

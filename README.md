@@ -28,14 +28,13 @@ All files have a maximum lifetime and are then deleted.
 ## Installation
 ### Generic Installation
 
-Go is required in a recent version; currently 1.17 or later.
+Go is required in a recent version; currently 1.19 or later.
 
 ```bash
 git clone https://github.com/oxzi/gosh.git
 cd gosh
 
-CGO_ENABLED=0 go build -gcflags="all=-N -l" ./cmd/goshd
-CGO_ENABLED=0 go build -gcflags="all=-N -l" ./cmd/gosh-query
+go build
 ```
 
 ### NixOS

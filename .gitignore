@@ -1,5 +1,4 @@
-/goshd
-/gosh-query
+/gosh
 /store
 
 # Created by https://www.gitignore.io/api/go

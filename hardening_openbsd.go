@@ -1,6 +1,6 @@
 //go:build openbsd
 
-package internal
+package main
 
 import (
 	"strings"

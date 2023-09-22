@@ -1,6 +1,6 @@
 //go:build !(aix || linux || darwin || dragonfly || freebsd || openbsd || netbsd || solaris)
 
-package internal
+package main
 
 import (
 	"net"

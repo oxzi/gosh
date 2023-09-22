@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20' ]
+        go: [ '1.19', '1.20', '1.21' ]
 
     steps:
     - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
 
     - run: go version
     - run: go build ./...
-    - run: go test -race ./...
+    - run: go test -race -v ./...
 
     - uses: golangci/golangci-lint-action@v3
       with:
@@ -36,8 +36,8 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20' ]
-        goos: [ 'freebsd', 'linux', 'openbsd', 'windows' ]
+        go: [ '1.19', '1.20', '1.21' ]
+        goos: [ 'freebsd', 'linux', 'openbsd' ]
 
     env:
       GOOS: ${{ matrix.goos }}
