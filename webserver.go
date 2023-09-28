@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/fcgi"
+	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -193,6 +195,27 @@ func NewServer(store *StoreRpcClient, maxSize int64, maxLifetime time.Duration,
 		urlPrefix:   urlPrefix,
 	}
 	return
+}
+
+// ListenFcgi starts an FastCGI listener on the given file descriptor.
+func (serv *Server) ListenFcgi(fd *os.File) error {
+	ln, err := net.FileListener(fd)
+	if err != nil {
+		return err
+	}
+
+	return fcgi.Serve(ln, serv)
+}
+
+// ListenHttpd starts an HTTPD listener on the given file descriptor.
+func (serv *Server) ListenHttpd(fd *os.File) error {
+	webServer := &http.Server{Handler: serv}
+	ln, err := net.FileListener(fd)
+	if err != nil {
+		return err
+	}
+
+	return webServer.Serve(ln)
 }
 
 // Close the Server and its components.
