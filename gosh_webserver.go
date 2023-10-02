@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/user"
 	"strconv"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -93,7 +92,7 @@ func mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup string) (*o
 	}
 }
 
-func mainWebserver() {
+func mainWebserver(conf Config) {
 	log.Info("Starting web server child")
 
 	rpcConn, err := UnixConnFromFile(os.NewFile(3, ""))
@@ -107,64 +106,46 @@ func mainWebserver() {
 
 	storeClient := NewStoreRpcClient(rpcConn, fdConn)
 
-	// XXX replace with configuration
-	/*
-		if lt, err := ParseDuration(maxLifetimeStr); err != nil {
-			log.WithError(err).Fatal("Failed to parse lifetime")
-		} else {
-			maxLifetime = lt
-		}
+	maxFilesize, err := ParseBytesize(conf.Webserver.ItemConfig.MaxSize)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to parse byte size")
+	}
 
-		if bs, err := ParseBytesize(maxFilesizeStr); err != nil {
-			log.WithError(err).Fatal("Failed to parse byte size")
-		} else {
-			maxFilesize = bs
-		}
+	mimeMap := make(MimeMap)
+	for _, key := range conf.Webserver.ItemConfig.MimeDrop {
+		mimeMap[key] = MimeDrop
+	}
+	for key, value := range conf.Webserver.ItemConfig.MimeMap {
+		mimeMap[key] = value
+	}
 
-		if mimeMapStr == "" {
-			mimeMap = make(MimeMap)
-		} else {
-			if f, err := os.Open(mimeMapStr); err != nil {
-				log.WithError(err).Fatal("Failed to open MimeMap")
-			} else if mm, err := NewMimeMap(f); err != nil {
-				log.WithError(err).Fatal("Failed to parse MimeMap")
-			} else {
-				f.Close()
-				mimeMap = mm
-			}
-		}
-	*/
-	var (
-		protocol  string = "tcp"
-		bound     string = ":8080"
-		unixChmod string = "0600"
-		unixOwner string = "www"
-		unixGroup string = "www"
-
-		maxFilesize int64         = 10 * 1024 * 1024
-		maxLifetime time.Duration = 24 * time.Hour
-		contactMail string        = "nobody@example.com"
-		mimeMap     MimeMap       = make(MimeMap)
-		urlPrefix   string        = ""
-
-		fcgiServer bool = false
-	)
-
-	fd, err := mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup)
+	fd, err := mkListenSocket(
+		conf.Webserver.Listen.Protocol, conf.Webserver.Listen.Bound,
+		conf.Webserver.UnixSocket.Chmod, conf.Webserver.UnixSocket.Owner, conf.Webserver.UnixSocket.Group)
 	if err != nil {
 		log.WithError(err).Fatal("Cannot create socket to be bound to")
 	}
 
-	server, err := NewServer(storeClient, maxFilesize, maxLifetime, contactMail, mimeMap, urlPrefix)
+	server, err := NewServer(
+		storeClient,
+		maxFilesize, conf.Webserver.ItemConfig.MaxLifetime,
+		conf.Webserver.Contact,
+		mimeMap,
+		conf.Webserver.UrlPrefix)
 	if err != nil {
 		log.WithError(err).Fatal("Cannot create web server")
 	}
 	defer server.Close()
 
-	if fcgiServer {
-		err = server.ListenFcgi(fd)
-	} else {
-		err = server.ListenHttpd(fd)
+	switch conf.Webserver.Protocol {
+	case "fcgi":
+		err = server.ServeFcgi(fd)
+
+	case "http":
+		err = server.ServeHttpd(fd)
+
+	default:
+		err = fmt.Errorf("unsupported protocol %q", conf.Webserver.Protocol)
 	}
 	if err != nil && err != http.ErrServerClosed {
 		log.WithError(err).Error("Web server failed to listen")

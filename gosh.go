@@ -7,11 +7,66 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"time"
 
 	"golang.org/x/sys/unix"
+	"gopkg.in/yaml.v3"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// Config is the struct representation of gosh's YAML configuration file.
+//
+// For each field's meaning, please consider the gosh.yml file in this
+// repository as it serves both as an example as well as documentation and
+// otherwise the documentation will diverge anyways.
+type Config struct {
+	Store struct {
+		Path string
+	}
+
+	Webserver struct {
+		Listen struct {
+			Protocol string
+			Bound    string
+		}
+
+		UnixSocket struct {
+			Chmod string
+			Owner string
+			Group string
+		} `yaml:"unix_socket"`
+
+		Protocol string
+
+		UrlPrefix string `yaml:"url_prefix"`
+
+		ItemConfig struct {
+			MaxSize     string        `yaml:"max_size"`
+			MaxLifetime time.Duration `yaml:"max_lifetime"`
+
+			MimeDrop []string          `yaml:"mime_drop"`
+			MimeMap  map[string]string `yaml:"mime_map"`
+		} `yaml:"item_config"`
+
+		Contact string
+	}
+}
+
+// loadConfig loads a Config from a given YAML configuration file at the path.
+func loadConfig(path string) (Config, error) {
+	var conf Config
+
+	f, err := os.Open(path)
+	if err != nil {
+		return conf, err
+	}
+	defer f.Close()
+
+	decoder := yaml.NewDecoder(f)
+	err = decoder.Decode(&conf)
+	return conf, err
+}
 
 // forkChild forks off a subprocess for the given child subroutine.
 //
@@ -49,37 +104,7 @@ func forkChild(child string, extraFiles []*os.File, ctx context.Context) (*exec.
 	return cmd, nil
 }
 
-func main() {
-	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
-
-	var (
-		flagStorePath string
-		flagForkChild string
-		flagVerbose   bool
-	)
-
-	log.WithField("args", os.Args).Info("args")
-
-	flag.StringVar(&flagStorePath, "store", "", "Path to the store")
-	flag.StringVar(&flagForkChild, "fork-child", "", "Start a subprocess child")
-	flag.BoolVar(&flagVerbose, "verbose", false, "Verbose logging")
-
-	flag.Parse()
-
-	if flagVerbose {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	switch flagForkChild {
-	case "webserver":
-		mainWebserver()
-		return
-
-	case "store":
-		mainStore(flagStorePath)
-		return
-	}
-
+func mainMonitor(conf Config) {
 	storeRpcServer, storeRpcClient, err := Socketpair()
 	if err != nil {
 		log.Fatal(err)
@@ -102,8 +127,44 @@ func main() {
 		log.Fatal(err)
 	}
 
-	select {
-	case <-ctx.Done():
-		log.WithError(ctx.Err()).Error("Context was canceled")
+	<-ctx.Done()
+}
+
+func main() {
+	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
+
+	var (
+		flagConfig    string
+		flagForkChild string
+		flagVerbose   bool
+	)
+
+	flag.StringVar(&flagConfig, "config", "", "YAML configuration file")
+	flag.StringVar(&flagForkChild, "fork-child", "", "Start a subprocess child")
+	flag.BoolVar(&flagVerbose, "verbose", false, "Verbose logging")
+
+	flag.Parse()
+
+	if flagVerbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	conf, err := loadConfig(flagConfig)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot parse YAML configuration")
+	}
+
+	switch flagForkChild {
+	case "webserver":
+		mainWebserver(conf)
+
+	case "store":
+		mainStore(conf)
+
+	case "":
+		mainMonitor(conf)
+
+	default:
+		log.WithField("fork-child", flagForkChild).Fatal("Unknown child process")
 	}
 }

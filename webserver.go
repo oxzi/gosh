@@ -197,8 +197,8 @@ func NewServer(store *StoreRpcClient, maxSize int64, maxLifetime time.Duration,
 	return
 }
 
-// ListenFcgi starts an FastCGI listener on the given file descriptor.
-func (serv *Server) ListenFcgi(fd *os.File) error {
+// ServeFcgi starts an FastCGI listener on the given file descriptor.
+func (serv *Server) ServeFcgi(fd *os.File) error {
 	ln, err := net.FileListener(fd)
 	if err != nil {
 		return err
@@ -207,8 +207,8 @@ func (serv *Server) ListenFcgi(fd *os.File) error {
 	return fcgi.Serve(ln, serv)
 }
 
-// ListenHttpd starts an HTTPD listener on the given file descriptor.
-func (serv *Server) ListenHttpd(fd *os.File) error {
+// ServeHttpd starts an HTTPD listener on the given file descriptor.
+func (serv *Server) ServeHttpd(fd *os.File) error {
 	webServer := &http.Server{Handler: serv}
 	ln, err := net.FileListener(fd)
 	if err != nil {

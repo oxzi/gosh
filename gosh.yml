@@ -1,0 +1,49 @@
+---
+
+# The store section describes the storage server's configuration.
+store:
+  path: "./store"
+
+
+# The webserver section describes the web server's configuration.
+#
+# The web server will be bound to some socket (TCP or Unix) and starts listening
+# for either HTTP or FastCGI requests.
+webserver:
+  # listen defines on which protocol ("tcp" or "unix") the listener should be
+  # bound to. The value must either be a tuple of an IP address and a port or a
+  # file system path for the Unix domain socket. Please make sure that
+  # listen_protocol matches.
+  listen:
+    protocol: "tcp"
+    bound: ":8080"
+
+  # unix_socket's chmod, owner, and group are setting the file system
+  # permissions for the socket if listen_protocol is "unix".
+  unix_socket:
+    chmod: "0600"
+    owner: "www"
+    group: "www"
+
+  # protocol defines the application level protocol the web server should speak.
+  # It should be either "http", for an HTTP server, or "fcgi", for FastCGI.
+  protocol: "http"
+
+  # url_prefix is an optional prefix in URL to be used, e.g., "/gosh"
+  url_prefix: ""
+
+  # item_config sets restrictions for new items, e.g., their max_size, in bytes
+  # or suffixed with a unit, and max_lifetime, as a Go duration. Furthermore,
+  # some MIME types might be dropped by mime_drop or rewritten with mime_map.
+  item_config:
+    max_size: "10MiB"
+    max_lifetime: "24h"
+
+    mime_drop:
+      - "application/vnd.microsoft.portable-executable"
+      - "application/x-msdownload"
+    mime_map:
+      "text/html": "text/plain"
+
+  # contact should be an email address to be publicly displayed for abuses.
+  contact: "nobody@example.com"

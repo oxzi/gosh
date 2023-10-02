@@ -7,10 +7,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func mainStore(storePath string) {
-	log.WithField("store", storePath).Info("Starting store child")
+func mainStore(conf Config) {
+	log.WithField("store", conf.Store.Path).Info("Starting store child")
 
-	store, err := NewStore(storePath, true)
+	store, err := NewStore(conf.Store.Path, true)
 	if err != nil {
 		log.Fatal(err)
 	}
