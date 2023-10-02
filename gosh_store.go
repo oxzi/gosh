@@ -8,9 +8,14 @@ import (
 )
 
 func mainStore(conf Config) {
-	log.WithField("store", conf.Store.Path).Info("Starting store child")
+	log.WithField("config", conf.Store).Debug("Starting store child")
 
-	store, err := NewStore(conf.Store.Path, true)
+	err := posixPermDrop(conf.Store.Path, conf.User, conf.Group)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot drop permissions")
+	}
+
+	store, err := NewStore("/", true)
 	if err != nil {
 		log.Fatal(err)
 	}

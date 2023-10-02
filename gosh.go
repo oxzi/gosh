@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
+	"strconv"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -21,6 +24,9 @@ import (
 // repository as it serves both as an example as well as documentation and
 // otherwise the documentation will diverge anyways.
 type Config struct {
+	User  string
+	Group string
+
 	Store struct {
 		Path string
 	}
@@ -104,6 +110,58 @@ func forkChild(child string, extraFiles []*os.File, ctx context.Context) (*exec.
 	return cmd, nil
 }
 
+// posixPermDrop uses (more or less) POSIX defined options to drop privileges.
+//
+// Frist, a chroot is set to the given path. Afterwards, the effective UID and
+// GID are being set to those of the given user and group.
+//
+// It says "more or less POSIX" as setresuid(2) and setresgid(2) aren't part of
+// any standard (yet), but are supported by most operating systems.
+func posixPermDrop(chroot, username, group string) error {
+	// Lookup requires access to /etc/{passwd,group} - perform before chrooting.
+	userStruct, err := user.Lookup(username)
+	if err != nil {
+		return err
+	}
+	userId, err := strconv.ParseInt(userStruct.Uid, 10, 64)
+	if err != nil {
+		return err
+	}
+	groupStruct, err := user.LookupGroup(group)
+	if err != nil {
+		return err
+	}
+	groupId, err := strconv.ParseInt(groupStruct.Gid, 10, 64)
+	if err != nil {
+		return err
+	}
+	uid, gid := int(userId), int(groupId)
+
+	err = unix.Chroot(chroot)
+	if err != nil {
+		return fmt.Errorf("chroot: %w", err)
+	}
+	err = unix.Chdir("/")
+	if err != nil {
+		return fmt.Errorf("chdir: %w", err)
+	}
+
+	err = unix.Setgroups([]int{gid})
+	if err != nil {
+		return fmt.Errorf("setgroups: %w", err)
+	}
+	err = unix.Setresgid(gid, gid, gid)
+	if err != nil {
+		return fmt.Errorf("setresgid: %w", err)
+	}
+	err = unix.Setresuid(uid, uid, uid)
+	if err != nil {
+		return fmt.Errorf("setresuid: %w", err)
+	}
+
+	return nil
+}
+
 func mainMonitor(conf Config) {
 	storeRpcServer, storeRpcClient, err := Socketpair()
 	if err != nil {
@@ -125,6 +183,15 @@ func mainMonitor(conf Config) {
 	_, err = forkChild("webserver", []*os.File{storeRpcClient, storeFdClient}, ctx)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	bottomlessPit, err := os.MkdirTemp("", "gosh-monitor-chroot")
+	if err != nil {
+		log.WithError(err).Fatal("Cannot create bottomless pit jail")
+	}
+	err = posixPermDrop(bottomlessPit, conf.User, conf.Group)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot drop permissions")
 	}
 
 	<-ctx.Done()

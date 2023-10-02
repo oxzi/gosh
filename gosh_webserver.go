@@ -93,7 +93,7 @@ func mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup string) (*o
 }
 
 func mainWebserver(conf Config) {
-	log.Info("Starting web server child")
+	log.WithField("config", conf.Webserver).Debug("Starting web server child")
 
 	rpcConn, err := UnixConnFromFile(os.NewFile(3, ""))
 	if err != nil {
@@ -124,6 +124,15 @@ func mainWebserver(conf Config) {
 		conf.Webserver.UnixSocket.Chmod, conf.Webserver.UnixSocket.Owner, conf.Webserver.UnixSocket.Group)
 	if err != nil {
 		log.WithError(err).Fatal("Cannot create socket to be bound to")
+	}
+
+	bottomlessPit, err := os.MkdirTemp("", "gosh-webserver-chroot")
+	if err != nil {
+		log.WithError(err).Fatal("Cannot create bottomless pit jail")
+	}
+	err = posixPermDrop(bottomlessPit, conf.User, conf.Group)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot drop permissions")
 	}
 
 	server, err := NewServer(

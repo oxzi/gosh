@@ -1,5 +1,10 @@
 ---
 
+# user and group will be the system user and group to drop permissions to.
+user: "_gosh"
+group: "_gosh"
+
+
 # The store section describes the storage server's configuration.
 store:
   path: "./store"
