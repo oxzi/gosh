@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/user"
 	"strconv"
 
 	"golang.org/x/sys/unix"
@@ -52,24 +51,12 @@ func mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup string) (*o
 			return nil, err
 		}
 
-		unixOwnerStruct, err := user.Lookup(unixOwner)
-		if err != nil {
-			return nil, err
-		}
-		unixOwnerId, err := strconv.ParseInt(unixOwnerStruct.Uid, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		unixGroupStruct, err := user.LookupGroup(unixGroup)
-		if err != nil {
-			return nil, err
-		}
-		unixGroupId, err := strconv.ParseInt(unixGroupStruct.Gid, 10, 64)
+		uid, gid, err := uidGidForUserGroup(unixOwner, unixGroup)
 		if err != nil {
 			return nil, err
 		}
 
-		err = os.Chown(bound, int(unixOwnerId), int(unixGroupId))
+		err = os.Chown(bound, uid, gid)
 		if err != nil {
 			return nil, err
 		}

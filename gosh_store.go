@@ -7,10 +7,43 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ensureStoreDir makes sure that a store directory exists and it holds the
+// correct permissions.
+func ensureStoreDir(path, username, groupname string) error {
+	_, stat := os.Stat(path)
+	if os.IsNotExist(stat) {
+		err := os.Mkdir(path, 0700)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := os.Chmod(path, 0700)
+	if err != nil {
+		return err
+	}
+
+	uid, gid, err := uidGidForUserGroup(username, groupname)
+	if err != nil {
+		return err
+	}
+	err = os.Chown(path, uid, gid)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func mainStore(conf Config) {
 	log.WithField("config", conf.Store).Debug("Starting store child")
 
-	err := posixPermDrop(conf.Store.Path, conf.User, conf.Group)
+	err := ensureStoreDir(conf.Store.Path, conf.User, conf.Group)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot prepare store directory")
+	}
+
+	err = posixPermDrop(conf.Store.Path, conf.User, conf.Group)
 	if err != nil {
 		log.WithError(err).Fatal("Cannot drop permissions")
 	}

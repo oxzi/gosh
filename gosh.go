@@ -110,6 +110,29 @@ func forkChild(child string, extraFiles []*os.File, ctx context.Context) (*exec.
 	return cmd, nil
 }
 
+// uidGidForUserGroup fetches an UID and GID for the given user and group.
+func uidGidForUserGroup(username, groupname string) (uid, gid int, err error) {
+	userStruct, err := user.Lookup(username)
+	if err != nil {
+		return
+	}
+	userId, err := strconv.ParseInt(userStruct.Uid, 10, 64)
+	if err != nil {
+		return
+	}
+	groupStruct, err := user.LookupGroup(groupname)
+	if err != nil {
+		return
+	}
+	groupId, err := strconv.ParseInt(groupStruct.Gid, 10, 64)
+	if err != nil {
+		return
+	}
+
+	uid, gid = int(userId), int(groupId)
+	return
+}
+
 // posixPermDrop uses (more or less) POSIX defined options to drop privileges.
 //
 // Frist, a chroot is set to the given path. Afterwards, the effective UID and
@@ -117,25 +140,11 @@ func forkChild(child string, extraFiles []*os.File, ctx context.Context) (*exec.
 //
 // It says "more or less POSIX" as setresuid(2) and setresgid(2) aren't part of
 // any standard (yet), but are supported by most operating systems.
-func posixPermDrop(chroot, username, group string) error {
-	// Lookup requires access to /etc/{passwd,group} - perform before chrooting.
-	userStruct, err := user.Lookup(username)
+func posixPermDrop(chroot, username, groupname string) error {
+	uid, gid, err := uidGidForUserGroup(username, groupname)
 	if err != nil {
 		return err
 	}
-	userId, err := strconv.ParseInt(userStruct.Uid, 10, 64)
-	if err != nil {
-		return err
-	}
-	groupStruct, err := user.LookupGroup(group)
-	if err != nil {
-		return err
-	}
-	groupId, err := strconv.ParseInt(groupStruct.Gid, 10, 64)
-	if err != nil {
-		return err
-	}
-	uid, gid := int(userId), int(groupId)
 
 	err = unix.Chroot(chroot)
 	if err != nil {
