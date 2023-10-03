@@ -15,6 +15,29 @@ func mainStore(conf Config) {
 		log.WithError(err).Fatal("Cannot drop permissions")
 	}
 
+	err = restrict(restrict_linux_seccomp,
+		[]string{
+			"@system-service",
+			"~@chown",
+			"~@clock",
+			"~@cpu-emulation",
+			"~@debug",
+			"~@keyring",
+			"~@memlock",
+			"~@module",
+			"~@mount",
+			"~@privileged",
+			"~@reboot",
+			"~@sandbox",
+			"~@setuid",
+			"~@swap",
+			/* @process */ "~execve", "~execveat", "~fork", "~kill",
+			/* @network-io */ "~bind", "~connect", "~listen",
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	store, err := NewStore("/", true)
 	if err != nil {
 		log.Fatal(err)

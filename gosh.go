@@ -163,6 +163,13 @@ func posixPermDrop(chroot, username, group string) error {
 }
 
 func mainMonitor(conf Config) {
+	// err := restrict(restrict_openbsd_pledge,
+	// 	"stdio rpath wpath cpath tmppath                  flock                    tty proc exec id",
+	// 	"stdio rpath wpath cpath tmppath inet fattr chown flock unix sendfd recvfd tty proc      id")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	storeRpcServer, storeRpcClient, err := Socketpair()
 	if err != nil {
 		log.Fatal(err)
@@ -193,6 +200,35 @@ func mainMonitor(conf Config) {
 	if err != nil {
 		log.WithError(err).Fatal("Cannot drop permissions")
 	}
+
+	err = restrict(restrict_linux_seccomp,
+		[]string{
+			"@system-service",
+			"~@chown",
+			"~@clock",
+			"~@cpu-emulation",
+			"~@debug",
+			"~@file-system",
+			"~@keyring",
+			"~@memlock",
+			"~@module",
+			"~@mount",
+			"~@network-io",
+			"~@privileged",
+			"~@reboot",
+			"~@sandbox",
+			"~@setuid",
+			"~@swap",
+			/* @process */ "~execve", "~execveat", "~fork", "~kill",
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// err = restrict(restrict_openbsd_pledge, "stdio tty proc", "")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	<-ctx.Done()
 }

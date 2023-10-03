@@ -135,6 +135,29 @@ func mainWebserver(conf Config) {
 		log.WithError(err).Fatal("Cannot drop permissions")
 	}
 
+	err = restrict(restrict_linux_seccomp,
+		[]string{
+			"@system-service",
+			"~@chown",
+			"~@clock",
+			"~@cpu-emulation",
+			"~@debug",
+			"~@keyring",
+			"~@memlock",
+			"~@module",
+			"~@mount",
+			"~@privileged",
+			"~@reboot",
+			"~@sandbox",
+			"~@setuid",
+			"~@swap",
+			/* @process */ "~execve", "~execveat", "~fork", "~kill",
+			/* @network-io */ "~bind", "~connect", "~listen",
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	server, err := NewServer(
 		storeClient,
 		maxFilesize, conf.Webserver.ItemConfig.MaxLifetime,
