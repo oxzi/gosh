@@ -145,6 +145,13 @@ func mainWebserver(conf Config) {
 		log.Fatal(err)
 	}
 
+	err = restrict(restrict_openbsd_pledge,
+		"stdio unix sendfd recvfd error",
+		"")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	server, err := NewServer(
 		storeClient,
 		maxFilesize, conf.Webserver.ItemConfig.MaxLifetime,

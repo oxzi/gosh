@@ -71,6 +71,13 @@ func mainStore(conf Config) {
 		log.Fatal(err)
 	}
 
+	err = restrict(restrict_openbsd_pledge,
+		"stdio rpath wpath cpath flock unix sendfd recvfd error",
+		"")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	store, err := NewStore("/", true)
 	if err != nil {
 		log.Fatal(err)

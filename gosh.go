@@ -172,13 +172,6 @@ func posixPermDrop(chroot, username, groupname string) error {
 }
 
 func mainMonitor(conf Config) {
-	// err := restrict(restrict_openbsd_pledge,
-	// 	"stdio rpath wpath cpath tmppath                  flock                    tty proc exec id",
-	// 	"stdio rpath wpath cpath tmppath inet fattr chown flock unix sendfd recvfd tty proc      id")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
 	storeRpcServer, storeRpcClient, err := Socketpair()
 	if err != nil {
 		log.Fatal(err)
@@ -234,10 +227,10 @@ func mainMonitor(conf Config) {
 		log.Fatal(err)
 	}
 
-	// err = restrict(restrict_openbsd_pledge, "stdio tty proc", "")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err = restrict(restrict_openbsd_pledge, "stdio tty error", "")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	<-ctx.Done()
 }
