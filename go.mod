@@ -27,7 +27,7 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.66 // indirect
 )
