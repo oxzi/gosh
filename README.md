@@ -1,28 +1,35 @@
 # gosh! Go Share ![CI](https://github.com/oxzi/gosh/workflows/CI/badge.svg)
 
 gosh is a simple HTTP file sharing server on which users can upload their files without login or authentication.
-All files have a maximum lifetime and are then deleted.
+All files have a maximum lifetime and are then purged.
 
 
 ## Features
 
-- Standalone HTTP web server, no additional server needed (might be proxied for HTTPS)
-- Supports a FastCGI server instead of HTTP if `--listen fcgi:/path/to.sock`
-- Store with both files and some metadata
-- Only safe uploader's IP address for legal reasons, anonymous download
-- File and all metadata are automatically deleted after expiration
-- Configurable maximum lifetime and file size for uploads
-- Replace or drop configured MIME types
-- Simple upload both via webpanel or by `curl`, `wget` or the like
-- User manual available from the `/` page
-- Uploads can specify their own shorter lifetime
-- Each upload generates also generates a custom deletion URL
-- Burn after Reading: uploads can be deleted after the first download
-- Client side caching by HTTP headers `Last-Modified` and `If-Modified-Since` and HTTP status code 304
-- On Linux there is additional hardening through Landlock and seccomp-bpf
-- On OpenBSD there is additional hardening through pledge and unveil
-- Print only the final URL with the `?onlyURL` GET parameter instead of a more verbose output
-- Configurable URL prefix, e.g., host under `http://example.org/gosh/`.
+- __Configurability__
+  - One short YAML file for everything
+  - Custom maximum file size and lifetime
+  - MIME type filter and rewriting
+- __Uploading__
+  - Configure a shorter file lifetime for each upload
+  - Mark files as burn-after-reading to be deleted after first retrieval
+  - Uploader receives deletion URL to remove files before their expiration
+  - User manual available from the `/` page
+  - Web panel to click those settings
+  - HTTP POSTing through `curl` or the like
+- __Web server modes__
+  - Standalone HTTP web server mode
+  - FastCGI web server mode
+  - Client side caching by HTTP headers `Last-Modified` / `If-Modified-Since` and HTTP status code 304
+  - URL prefix support to host, e.g., under `http://example.org/gosh/`
+- __Store__
+  - Local file and metadata store
+  - Uploader's IP address will be stored for legal reasons, anonymous download
+  - All data will be purged when file is deleted
+- __Hardening__
+  - `chroot`ed, privilege dropped, `fork`+`exec`ed daemon
+  - `seccomp-bpf` filtered on Linux
+  - `pledge` promised on OpenBSD
 
 
 ## Installation
@@ -37,11 +44,15 @@ cd gosh
 go build
 ```
 
+
 ### NixOS
 
 #### Server module
 
-On a NixOS system one can configure gosh as a module. Have look at the example in `contrib/nixos/`.
+> __NOTE: THIS SECTION IS CURRENTLY OUTDATED__
+
+On a NixOS system one can configure gosh as a module.
+Have look at the example in `contrib/nixos/`.
 
 ```nix
 # Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
@@ -85,7 +96,8 @@ On a NixOS system one can configure gosh as a module. Have look at the example i
 
 #### Program module
 
-On a NixOS system one can also configure goshy as a program. Have look at the example in `contrib/nixos/goshy.nix`.
+On a NixOS system one can also configure `goshy` as a program.
+Have look at the example in `contrib/nixos/goshy.nix`.
 
 ```nix
 # Example configuration to proxy gosh with nginx with a valid HTTPS certificate.
@@ -106,9 +118,12 @@ On a NixOS system one can also configure goshy as a program. Have look at the ex
 }
 ```
 
+
 ### OpenBSD
 
-Start by (cross-) compiling `goshd` for OpenBSD as described in the generic instructions above.
+> __NOTE: THIS SECTION IS CURRENTLY OUTDATED__
+
+Start by (cross-) compiling `gosh` for OpenBSD as described in the generic instructions above.
 
 Afterwards copy the `./contrib/openbsd/goshd-rcd` rc.d file to `/etc/rc.d/goshd` and modify if necessary.
 You should at least replace `example.org` by your domain and create the directories below `/var/www`.
@@ -143,99 +158,24 @@ server "example.org" {
 
 Don't forget to `rcctl reload httpd` your configuration changes.
 
-## Commands
-### goshd
 
-`goshd` is the web server, as described above.
+## Running gosh
 
 ```
-Usage of ./goshd:
-  -alsologtostderr
-        log to standard error as well as files
-  -contact string
-        Contact E-Mail for abuses
-  -fcgi
-        Serve a FastCGI server instead of a HTTP server
-  -listen string
-        Either a TCP listen address or an Unix domain socket (default ":8080")
-  -log_backtrace_at value
-        when logging hits line file:N, emit a stack trace
-  -log_dir string
-        If non-empty, write log files in this directory
-  -logtostderr
-        log to standard error instead of files
-  -max-filesize string
-        Maximum file size in bytes (default "10MiB")
-  -max-lifetime string
-        Maximum lifetime (default "24h")
-  -mimemap string
-        MimeMap to substitute/drop MIMEs
-  -stderrthreshold value
-        logs at or above this threshold go to stderr
-  -store string
-        Path to the store
-  -url-prefix string
-        Prefix in URL to be used, e.g., /gosh
-  -user string
-        User to drop privileges to, also create a chroot - requires root permissions
-  -v value
-        log level for V logs
-  -verbose
-        Verbose logging
-  -vmodule value
-        comma-separated list of pattern=N settings for file-filtered logging
-```
-
-An example usage could look like this.
-
-```bash
-./goshd \
-  -contact my@email.address \
-  -max-filesize 64MiB \
-  -max-lifetime 2w \
-  -mimemap Mimemap \
-  -store /path/to/my/store/dir
-```
-
-The *MimeMap* file contains both substitutions or *drops* in each line and could look as follows.
-
-```
-# Replace text/html with text/plain
-text/html text/plain
-
-# Drop PNGs, because reasons.
-image/png DROP
-```
-
-
-### gosh-query
-
-The store can also be queried offline to get information or delete items. This is `gosh-query`'s job.
-
-```
-Usage of ./gosh-query:
-  -delete
-        Delete selection
-  -id string
-        Query for an ID
-  -ip-addr string
-        Query for an IP address
-  -store string
-        Path to the store
+Usage of ./gosh:
+  -config string
+        YAML configuration file
   -verbose
         Verbose logging
 ```
 
-```bash
-# Find all uploads from the localhost:
-./gosh-query -store /path/to/store -ip-addr ::1
+Please take a look at the provided example configuration in `gosh.yml`.
+Create a copy, modify it and run gosh with it.
 
-# Show information for upload with ID abcdef
-./gosh-query -store /path/to/store -id abcdef
-
-# And delete this one
-./gosh-query -store /path/to/store -delete -id abcdef
 ```
+sudo ./gosh -config gosh.yml -verbose
+```
+
 
 ## Posting
 
@@ -260,21 +200,25 @@ curl -F 'file=@foo.png' http://our-server.example/?onlyURL
 
 For use with the [Weechat-Android relay client](https://github.com/ubergeek42/weechat-android), simply add the `?onlyURL` GET parameter to the URL and enter in the settings under file sharing with no further changes.
 
+
 ## Shell functions and scripts
 
 A `fish` function and a `bash` script allow handily uploading a file to the server of your choice which need to be manually set.
 An own installation and deployment of `goshd` is not necessary to use tools.
 
+
 ### Bash, `contrib/bash/`
 
-The bash script is feature complete compared to the possibilites provided by using `curl` or the web interface.
+The bash script is feature complete compared to the possibilities provided by using `curl` or the web interface.
 To be able to use the script, add `goshy` to your PATH, make it executable and set the `GOSH_INSTANCE` environment variable.
 For learning the usage run `goshy -h`.
+
 
 ### Fish, `contrib/fish/`
 
 The fish function only provides the capability to upload a file and a flag for burn after reading.
 To be able to use the function, copy it's content to `~/.config/fish/config.fish`.
+
 
 ## Related Work
 
