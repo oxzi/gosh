@@ -29,6 +29,7 @@ Types of changes:
 - Great structural refactoring.
 - `goshd` became `gosh`.
 - Made `gosh` a `chroot`ed, privilege dropped, `fork`+`exec`ed daemon.
+- OpenBSD installation changed due to structural program changes.
 
 ### Deprecated
 ### Removed

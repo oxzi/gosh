@@ -37,7 +37,7 @@ All files have a maximum lifetime and are then purged.
 
 Go is required in a recent version; currently 1.19 or later.
 
-```bash
+```sh
 git clone https://github.com/oxzi/gosh.git
 cd gosh
 
@@ -121,21 +121,35 @@ Have look at the example in `contrib/nixos/goshy.nix`.
 
 ### OpenBSD
 
-> __NOTE: THIS SECTION IS CURRENTLY OUTDATED__
+Start by compiling `gosh` for OpenBSD as described in the generic instructions above.
+Then, prepare your system by creating an user, directories and a configuration.
 
-Start by (cross-) compiling `gosh` for OpenBSD as described in the generic instructions above.
+```sh
+go build
+doas cp gosh /usr/local/sbin/gosh
 
-Afterwards copy the `./contrib/openbsd/goshd-rcd` rc.d file to `/etc/rc.d/goshd` and modify if necessary.
-You should at least replace `example.org` by your domain and create the directories below `/var/www`.
+doas groupadd _gosh
+doas useradd -g _gosh -s /sbin/nologin -d /var/empty _gosh
 
-The service can be activated through:
+doas mkdir -p /etc/gosh/store
+doas cp gosh.yml /etc/gosh/
+doas chown -R _gosh:_gosh /etc/gosh/
+doas chmod 0700 /etc/gosh/store/
+
+doas -u _gosh vi /etc/gosh/gosh.yml
+# store.path to "/etc/gosh/store"
+# webserver.listen.protocol to "unix"
+# webserver.listen.bound to "/var/www/run/gosh.sock"
+# webserver.protocol to "fcgi"
+# webserver.item_config to whatever you find reasonable
+# webserver.contact to some real email address
+
+doas cp contrib/openbsd/gosh /etc/rc.d/gosh
+doas rcctl start gosh
+doas rcctl enable gosh
 ```
-rcctl set goshd flags -max-filesize 64MiB -max-lifetime 3d -contact gosh-abuse@example.org
-rcctl enable goshd
-rcctl start goshd
-```
 
-Your `/etc/httpd.conf` should contain a `server` block like the following one:
+Finally, alter your `/etc/httpd.conf` to contain a `server` block like the following one:
 ```
 server "example.org" {
   listen on * tls port 443
@@ -181,7 +195,7 @@ sudo ./gosh -config gosh.yml -verbose
 
 Files can be submitted via HTTP POST with common tools, e.g., with `curl`.
 
-```bash
+```sh
 # Upload foo.png
 curl -F 'file=@foo.png' http://our-server.example/
 

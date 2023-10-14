@@ -22,6 +22,8 @@ webserver:
   listen:
     protocol: "tcp"
     bound: ":8080"
+    # protocol: "unix"
+    # bound: "/var/www/run/gosh.sock"
 
   # unix_socket's chmod, owner, and group are setting the file system
   # permissions for the socket if listen_protocol is "unix".

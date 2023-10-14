@@ -1,0 +1,14 @@
+#!/bin/ksh
+
+daemon="/usr/local/sbin/gosh"
+
+. /etc/rc.d/rc.subr
+
+pexp="${daemon}.*"
+rc_reload=NO
+
+rc_start() {
+  rc_exec "${daemon} -config /etc/gosh/gosh.yml ${daemon_flags} >> /var/www/logs/gosh.log 2>&1 &"
+}
+
+rc_cmd $1
