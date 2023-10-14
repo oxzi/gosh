@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
-	github.com/landlock-lsm/go-landlock v0.0.0-20230607164353-b03374193cb2
 	github.com/oxzi/syscallset-go v0.1.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/timshannon/badgerhold/v4 v4.0.2
@@ -25,10 +24,9 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
-	github.com/klauspost/compress v1.17.0 // indirect
+	github.com/klauspost/compress v1.17.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.69 // indirect
 )

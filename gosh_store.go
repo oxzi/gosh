@@ -5,6 +5,8 @@ import (
 	"os/signal"
 
 	log "github.com/sirupsen/logrus"
+
+	"golang.org/x/sys/unix"
 )
 
 // ensureStoreDir makes sure that a store directory exists and it holds the
@@ -83,11 +85,11 @@ func mainStore(conf Config) {
 		log.Fatal(err)
 	}
 
-	rpcConn, err := UnixConnFromFile(os.NewFile(3, ""))
+	rpcConn, err := unixConnFromFile(os.NewFile(3, ""))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fdConn, err := UnixConnFromFile(os.NewFile(4, ""))
+	fdConn, err := unixConnFromFile(os.NewFile(4, ""))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,7 +97,7 @@ func mainStore(conf Config) {
 	rpcStore := NewStoreRpcServer(store, rpcConn, fdConn)
 
 	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, os.Interrupt)
+	signal.Notify(sigint, unix.SIGINT)
 	<-sigint
 
 	err = rpcStore.Close()

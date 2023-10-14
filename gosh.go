@@ -1,15 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"context"
 	"flag"
-	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"os/user"
-	"strconv"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -74,122 +68,22 @@ func loadConfig(path string) (Config, error) {
 	return conf, err
 }
 
-// forkChild forks off a subprocess for the given child subroutine.
-//
-// The child process' output will be printed to this process' output. The
-// extraFiles are additional file descriptors for communication.
-func forkChild(child string, extraFiles []*os.File, ctx context.Context) (*exec.Cmd, error) {
-	logParent, logChild, err := Socketpair()
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		scanner := bufio.NewScanner(logParent)
-		for scanner.Scan() {
-			log.WithField("subprocess", child).Print(scanner.Text())
-			if err := scanner.Err(); err != nil {
-				log.WithField("subprocess", child).WithError(err).Error("Scanner failed")
-			}
-		}
-	}()
-
-	cmd := exec.CommandContext(ctx, os.Args[0], append(os.Args[1:], "-fork-child", child)...)
-
-	cmd.Env = []string{}
-	cmd.Stdin = nil
-	cmd.Stdout = logChild
-	cmd.Stderr = logChild
-	cmd.ExtraFiles = extraFiles
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	return cmd, nil
-}
-
-// uidGidForUserGroup fetches an UID and GID for the given user and group.
-func uidGidForUserGroup(username, groupname string) (uid, gid int, err error) {
-	userStruct, err := user.Lookup(username)
-	if err != nil {
-		return
-	}
-	userId, err := strconv.ParseInt(userStruct.Uid, 10, 64)
-	if err != nil {
-		return
-	}
-	groupStruct, err := user.LookupGroup(groupname)
-	if err != nil {
-		return
-	}
-	groupId, err := strconv.ParseInt(groupStruct.Gid, 10, 64)
-	if err != nil {
-		return
-	}
-
-	uid, gid = int(userId), int(groupId)
-	return
-}
-
-// posixPermDrop uses (more or less) POSIX defined options to drop privileges.
-//
-// Frist, a chroot is set to the given path. Afterwards, the effective UID and
-// GID are being set to those of the given user and group.
-//
-// It says "more or less POSIX" as setresuid(2) and setresgid(2) aren't part of
-// any standard (yet), but are supported by most operating systems.
-func posixPermDrop(chroot, username, groupname string) error {
-	uid, gid, err := uidGidForUserGroup(username, groupname)
-	if err != nil {
-		return err
-	}
-
-	err = unix.Chroot(chroot)
-	if err != nil {
-		return fmt.Errorf("chroot: %w", err)
-	}
-	err = unix.Chdir("/")
-	if err != nil {
-		return fmt.Errorf("chdir: %w", err)
-	}
-
-	err = unix.Setgroups([]int{gid})
-	if err != nil {
-		return fmt.Errorf("setgroups: %w", err)
-	}
-	err = unix.Setresgid(gid, gid, gid)
-	if err != nil {
-		return fmt.Errorf("setresgid: %w", err)
-	}
-	err = unix.Setresuid(uid, uid, uid)
-	if err != nil {
-		return fmt.Errorf("setresuid: %w", err)
-	}
-
-	return nil
-}
-
 func mainMonitor(conf Config) {
-	storeRpcServer, storeRpcClient, err := Socketpair()
+	storeRpcServer, storeRpcClient, err := socketpair()
 	if err != nil {
 		log.Fatal(err)
 	}
-	storeFdServer, storeFdClient, err := Socketpair()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ctx, cancel := signal.NotifyContext(context.Background(), unix.SIGINT)
-	defer cancel()
-
-	_, err = forkChild("store", []*os.File{storeRpcServer, storeFdServer}, ctx)
+	storeFdServer, storeFdClient, err := socketpair()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = forkChild("webserver", []*os.File{storeRpcClient, storeFdClient}, ctx)
+	procStore, err := forkChild("store", []*os.File{storeRpcServer, storeFdServer})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	procWebserver, err := forkChild("webserver", []*os.File{storeRpcClient, storeFdClient})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -221,18 +115,49 @@ func mainMonitor(conf Config) {
 			"~@sandbox",
 			"~@setuid",
 			"~@swap",
-			/* @process */ "~execve", "~execveat", "~fork", "~kill",
+			/* @process */ "~execve", "~execveat", "~fork",
 		})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = restrict(restrict_openbsd_pledge, "stdio tty error", "")
+	err = restrict(restrict_openbsd_pledge, "stdio tty proc error", "")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	<-ctx.Done()
+	sigintCh := make(chan os.Signal, 1)
+	signal.Notify(sigintCh, unix.SIGINT)
+
+	storeCh := make(chan struct{})
+	procWait(storeCh, procStore)
+
+	webserverCh := make(chan struct{})
+	procWait(webserverCh, procWebserver)
+
+	childProcs := []*os.Process{procStore, procWebserver}
+	childWaits := []chan struct{}{storeCh, webserverCh}
+
+	select {
+	case <-sigintCh:
+		log.Info("Main process receives SIGINT, shutting down")
+
+	case <-storeCh:
+		log.Error("The store subprocess has stopped, cleaning up")
+
+	case <-webserverCh:
+		log.Error("The web server subprocess has stopped, cleaning up")
+	}
+
+	for i, childProc := range childProcs {
+		_ = childProc.Signal(unix.SIGINT)
+
+		select {
+		case <-childWaits[i]:
+		case <-time.After(time.Second):
+			_ = childProc.Kill()
+		}
+	}
 }
 
 func main() {

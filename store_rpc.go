@@ -14,40 +14,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// pipe2 is a helper function wrapper around pipe2 from pipe(2).
-//
-// Even as pipe2 itself does not seems to be POSIX, it is at least implemented
-// by FreeBSD, NetBSD, OpenBSD, and Linux. It seems like the only advantage of
-// pipe2 over pipe in this use case is the non-blocking IO.
-func pipe2() (reader, writer *os.File, err error) {
-	fds := make([]int, 2)
-	err = unix.Pipe2(fds, unix.O_NONBLOCK)
-	if err != nil {
-		return
-	}
-
-	reader = os.NewFile(uintptr(fds[0]), "")
-	writer = os.NewFile(uintptr(fds[1]), "")
-	return
-}
-
-// Socketpair is a helper function wrapped around socketpair(2).
-func Socketpair() (parent, child *os.File, err error) {
-	fds, err := unix.Socketpair(
-		unix.AF_UNIX,
-		unix.SOCK_STREAM|unix.SOCK_NONBLOCK,
-		0)
-	if err != nil {
-		return
-	}
-
-	parent = os.NewFile(uintptr(fds[0]), "")
-	child = os.NewFile(uintptr(fds[1]), "")
-	return
-}
-
-// UnixConnFromFile converts a file (FD) into an Unix domain socket.
-func UnixConnFromFile(f *os.File) (*net.UnixConn, error) {
+// unixConnFromFile converts a file (FD) into an Unix domain socket.
+func unixConnFromFile(f *os.File) (*net.UnixConn, error) {
 	fConn, err := net.FileConn(f)
 	if err != nil {
 		return nil, err

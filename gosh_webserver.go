@@ -6,11 +6,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 
-	"golang.org/x/sys/unix"
-
 	log "github.com/sirupsen/logrus"
+
+	"golang.org/x/sys/unix"
 )
 
 // mkListenSocket creates the socket for the web server to be bound to.
@@ -82,11 +83,11 @@ func mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup string) (*o
 func mainWebserver(conf Config) {
 	log.WithField("config", conf.Webserver).Debug("Starting web server child")
 
-	rpcConn, err := UnixConnFromFile(os.NewFile(3, ""))
+	rpcConn, err := unixConnFromFile(os.NewFile(3, ""))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fdConn, err := UnixConnFromFile(os.NewFile(4, ""))
+	fdConn, err := unixConnFromFile(os.NewFile(4, ""))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -163,17 +164,33 @@ func mainWebserver(conf Config) {
 	}
 	defer server.Close()
 
-	switch conf.Webserver.Protocol {
-	case "fcgi":
-		err = server.ServeFcgi(fd)
+	sigintCh := make(chan os.Signal, 1)
+	signal.Notify(sigintCh, unix.SIGINT)
 
-	case "http":
-		err = server.ServeHttpd(fd)
+	serverCh := make(chan struct{})
+	go func() {
+		switch conf.Webserver.Protocol {
+		case "fcgi":
+			err = server.ServeFcgi(fd)
 
-	default:
-		err = fmt.Errorf("unsupported protocol %q", conf.Webserver.Protocol)
-	}
-	if err != nil && err != http.ErrServerClosed {
-		log.WithError(err).Error("Web server failed to listen")
+		case "http":
+			err = server.ServeHttpd(fd)
+
+		default:
+			err = fmt.Errorf("unsupported protocol %q", conf.Webserver.Protocol)
+		}
+		if err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Error("Web server failed to listen")
+		}
+
+		close(serverCh)
+	}()
+
+	select {
+	case <-sigintCh:
+		log.Info("Stopping web server")
+
+	case <-serverCh:
+		log.Error("Web server finished, shutting down")
 	}
 }

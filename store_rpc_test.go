@@ -226,28 +226,28 @@ func TestStoreRpcSession(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			serverRpcSocket, clientRpcSocket, err := Socketpair()
+			serverRpcSocket, clientRpcSocket, err := socketpair()
 			if err != nil {
 				t.Fatal(err)
 			}
-			serverFdSocket, clientFdSocket, err := Socketpair()
+			serverFdSocket, clientFdSocket, err := socketpair()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			serverRpcUnixSocket, err := UnixConnFromFile(serverRpcSocket)
+			serverRpcUnixSocket, err := unixConnFromFile(serverRpcSocket)
 			if err != nil {
 				t.Fatal(err)
 			}
-			clientRpcUnixSocket, err := UnixConnFromFile(clientRpcSocket)
+			clientRpcUnixSocket, err := unixConnFromFile(clientRpcSocket)
 			if err != nil {
 				t.Fatal(err)
 			}
-			serverFdUnixSocket, err := UnixConnFromFile(serverFdSocket)
+			serverFdUnixSocket, err := unixConnFromFile(serverFdSocket)
 			if err != nil {
 				t.Fatal(err)
 			}
-			clientFdUnixSocket, err := UnixConnFromFile(clientFdSocket)
+			clientFdUnixSocket, err := unixConnFromFile(clientFdSocket)
 			if err != nil {
 				t.Fatal(err)
 			}
