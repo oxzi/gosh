@@ -20,7 +20,7 @@ Types of changes:
 ## [Unreleased]
 ### Added
 - URL prefix support to host, e.g., under `http://example.org/gosh/`
-- Add goshy as bash script and NixOS program, [@riotbibt](https://github.com/riotbib) in [#27](https://github.com/oxzi/gosh/pull/27).
+- Add goshy as bash script and NixOS program, [@riotbib](https://github.com/riotbib) in [#27](https://github.com/oxzi/gosh/pull/27).
 - Created Store RPC working on Unix domain sockets to allow a `fork`+`exec`ed daemon.
 - Configuration through YAML configuration file.
 
@@ -30,6 +30,7 @@ Types of changes:
 - `goshd` became `gosh`.
 - Made `gosh` a `chroot`ed, privilege dropped, `fork`+`exec`ed daemon.
 - OpenBSD installation changed due to structural program changes.
+- Extract web template into a more editable file, [@riotbib](https://github.com/riotbib) in [#45](https://github.com/oxzi/gosh/pull/45).
 
 ### Deprecated
 ### Removed

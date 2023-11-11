@@ -2,16 +2,17 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
 	"net/http/fcgi"
 	"os"
 	"strings"
-	"html/template"
 	"time"
+
+	_ "embed"
 
 	log "github.com/sirupsen/logrus"
 )
