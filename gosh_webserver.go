@@ -101,12 +101,9 @@ func mainWebserver(conf Config) {
 		os.Exit(1)
 	}
 
-	mimeMap := make(MimeMap)
+	mimeDrop := make(map[string]struct{})
 	for _, key := range conf.Webserver.ItemConfig.MimeDrop {
-		mimeMap[key] = MimeDrop
-	}
-	for key, value := range conf.Webserver.ItemConfig.MimeMap {
-		mimeMap[key] = value
+		mimeDrop[key] = struct{}{}
 	}
 
 	fd, err := mkListenSocket(
@@ -164,7 +161,8 @@ func mainWebserver(conf Config) {
 		storeClient,
 		maxFilesize, conf.Webserver.ItemConfig.MaxLifetime,
 		conf.Webserver.Contact,
-		mimeMap,
+		mimeDrop,
+		conf.Webserver.ItemConfig.MimeMap,
 		conf.Webserver.UrlPrefix)
 	if err != nil {
 		slog.Error("Failed to create webserver", slog.Any("error", err))

@@ -36,19 +36,28 @@ type Server struct {
 	maxSize     int64
 	maxLifetime time.Duration
 	contactMail string
-	mimeMap     MimeMap
+	mimeDrop    map[string]struct{}
+	mimeMap     map[string]string
 	urlPrefix   string
 }
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
-func NewServer(store *StoreRpcClient, maxSize int64, maxLifetime time.Duration,
-	contactMail string, mimeMap MimeMap, urlPrefix string) (s *Server, err error) {
+func NewServer(
+	store *StoreRpcClient,
+	maxSize int64,
+	maxLifetime time.Duration,
+	contactMail string,
+	mimeDrop map[string]struct{},
+	mimeMap map[string]string,
+	urlPrefix string,
+) (s *Server, err error) {
 	s = &Server{
 		store:       store,
 		maxSize:     maxSize,
 		maxLifetime: maxLifetime,
 		contactMail: contactMail,
+		mimeDrop:    mimeDrop,
 		mimeMap:     mimeMap,
 		urlPrefix:   urlPrefix,
 	}
@@ -161,7 +170,7 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
-	} else if serv.mimeMap.MustDrop(item.ContentType) {
+	} else if _, drop := serv.mimeDrop[item.ContentType]; drop {
 		slog.Info("Prevented upload of an illegal MIME", slog.String("mime", item.ContentType))
 
 		http.Error(w, msgIllegalMime, http.StatusBadRequest)
@@ -214,9 +223,9 @@ func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, i
 
 	defer f.Close()
 
-	mimeType, err := serv.mimeMap.Substitute(item.ContentType)
-	if err != nil {
-		return fmt.Errorf("substituting MIME failed: %v", err)
+	mimeType := item.ContentType
+	if mimeSubst, ok := serv.mimeMap[mimeType]; ok {
+		mimeType = mimeSubst
 	}
 
 	w.Header().Set("Content-Type", mimeType)
