@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
-
-	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/sys/unix"
 )
@@ -81,22 +80,25 @@ func mkListenSocket(protocol, bound, unixChmod, unixOwner, unixGroup string) (*o
 }
 
 func mainWebserver(conf Config) {
-	log.WithField("config", conf.Webserver).Debug("Starting web server child")
+	slog.Debug("Starting webserver child", slog.Any("config", conf.Webserver))
 
 	rpcConn, err := unixConnFromFile(os.NewFile(3, ""))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to prepare store directory", slog.Any("error", err))
+		os.Exit(1)
 	}
 	fdConn, err := unixConnFromFile(os.NewFile(4, ""))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to prepare store directory", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	storeClient := NewStoreRpcClient(rpcConn, fdConn)
 
 	maxFilesize, err := ParseBytesize(conf.Webserver.ItemConfig.MaxSize)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to parse byte size")
+		slog.Error("Failed to parse byte size", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	mimeMap := make(MimeMap)
@@ -111,16 +113,19 @@ func mainWebserver(conf Config) {
 		conf.Webserver.Listen.Protocol, conf.Webserver.Listen.Bound,
 		conf.Webserver.UnixSocket.Chmod, conf.Webserver.UnixSocket.Owner, conf.Webserver.UnixSocket.Group)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot create socket to be bound to")
+		slog.Error("Failed to create listening socket", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	bottomlessPit, err := os.MkdirTemp("", "gosh-webserver-chroot")
 	if err != nil {
-		log.WithError(err).Fatal("Cannot create bottomless pit jail")
+		slog.Error("Failed to create bottomless pit jail", slog.Any("error", err))
+		os.Exit(1)
 	}
 	err = posixPermDrop(bottomlessPit, conf.User, conf.Group)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot drop permissions")
+		slog.Error("Failed to drop permissions", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_linux_seccomp,
@@ -143,14 +148,16 @@ func mainWebserver(conf Config) {
 			/* @network-io */ "~bind", "~connect", "~listen",
 		})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to apply seccomp-bpf filter", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_openbsd_pledge,
 		"stdio unix sendfd recvfd error",
 		"")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to pledge", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	server, err := NewServer(
@@ -160,7 +167,8 @@ func mainWebserver(conf Config) {
 		mimeMap,
 		conf.Webserver.UrlPrefix)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot create web server")
+		slog.Error("Failed to create webserver", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer server.Close()
 
@@ -180,7 +188,8 @@ func mainWebserver(conf Config) {
 			err = fmt.Errorf("unsupported protocol %q", conf.Webserver.Protocol)
 		}
 		if err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Error("Web server failed to listen")
+			slog.Error("Webserver failed to listen", slog.Any("error", err))
+			os.Exit(1)
 		}
 
 		close(serverCh)
@@ -188,9 +197,9 @@ func mainWebserver(conf Config) {
 
 	select {
 	case <-sigintCh:
-		log.Info("Stopping web server")
+		slog.Info("Stopping webserver")
 
 	case <-serverCh:
-		log.Error("Web server finished, shutting down")
+		slog.Error("Webserver finished, shutting down")
 	}
 }

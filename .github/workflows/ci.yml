@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20', '1.21' ]
+        go: [ '1.21' ]
 
     steps:
     - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20', '1.21' ]
+        go: [ '1.21' ]
         goos: [ 'freebsd', 'linux', 'openbsd' ]
 
     env:

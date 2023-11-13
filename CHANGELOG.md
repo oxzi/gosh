@@ -31,6 +31,8 @@ Types of changes:
 - Made `gosh` a `chroot`ed, privilege dropped, `fork`+`exec`ed daemon.
 - OpenBSD installation changed due to structural program changes.
 - Extract web template into a more editable file, [@riotbib](https://github.com/riotbib) in [#45](https://github.com/oxzi/gosh/pull/45).
+- Bumped required Go version from 1.19 to 1.21.
+- Replaced logrus logging with Go's new `log/slog` and do wrapping for child processes.
 
 ### Deprecated
 ### Removed

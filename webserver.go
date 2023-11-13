@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/fcgi"
@@ -13,8 +14,6 @@ import (
 	"time"
 
 	_ "embed"
-
-	log "github.com/sirupsen/logrus"
 )
 
 //go:embed index.html
@@ -104,7 +103,7 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		serv.handleUpload(w, r)
 
 	default:
-		log.WithField("method", r.Method).Debug("Called with unsupported method")
+		slog.Debug("Called with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 	}
@@ -113,7 +112,7 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	t, err := template.New("index").Parse(indexTpl)
 	if err != nil {
-		log.WithError(err).Error("Failed to parse template")
+		slog.Error("Failed to parse template", slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -141,29 +140,29 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := t.Execute(w, data); err != nil {
-		log.WithError(err).Error("Failed to execute template")
+		slog.Error("Failed to execute template", slog.Any("error", err))
 	}
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	item, f, err := NewItemFromRequest(r, serv.maxSize, serv.maxLifetime)
 	if err == ErrLifetimeTooLong {
-		log.Info("New Item with a too long lifetime was rejected")
+		slog.Info("New Item with a too long lifetime was rejected")
 
 		http.Error(w, msgLifetimeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err == ErrFileTooBig {
-		log.Info("New Item with a too great file size was rejected")
+		slog.Info("New Item with a too great file size was rejected")
 
 		http.Error(w, msgFileSizeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err != nil {
-		log.WithError(err).Error("Failed to create new Item")
+		slog.Error("Failed to create new Item", slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	} else if serv.mimeMap.MustDrop(item.ContentType) {
-		log.WithField("MIME", item.ContentType).Info("Prevented upload of an illegal MIME")
+		slog.Info("Prevented upload of an illegal MIME", slog.String("mime", item.ContentType))
 
 		http.Error(w, msgIllegalMime, http.StatusBadRequest)
 		return
@@ -171,16 +170,14 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	itemId, err := serv.store.Put(item, f, context.Background())
 	if err != nil {
-		log.WithError(err).Error("Failed to store Item")
+		slog.Error("Failed to store Item", slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"ID":      itemId,
-		"expires": item.Expires,
-	}).Info("Uploaded new Item")
+	slog.Info("Uploaded new Item",
+		slog.String("id", itemId), slog.Any("expires", item.Expires))
 
 	w.WriteHeader(http.StatusOK)
 
@@ -239,7 +236,7 @@ func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, i
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		log.WithField("method", r.Method).Debug("Request with unsupported method")
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
@@ -250,43 +247,45 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
-		log.WithField("ID", reqId).Debug("Requested non-existing ID")
+		slog.Debug("Requested non-existing ID", slog.String("id", reqId))
 
 		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
+		slog.Warn("Failed to request", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	if serv.hasClientCachedRequest(r, item) {
-		log.WithField("ID", reqId).Debug("Requested with conditional GET; HTTP Status Code 304")
+		slog.Debug("Requested with conditional GET; HTTP Status Code 304", slog.String("id", reqId))
 		w.WriteHeader(http.StatusNotModified)
 	} else {
 		err := serv.handleRequestServe(w, r, item)
 		if err != nil {
-			log.WithError(err).WithField("ID", reqId).Warn("Serving the request failed")
+			slog.Warn("Failed to serve request",
+				slog.Any("error", err), slog.String("id", reqId))
 
 			http.Error(w, msgGenericError, http.StatusBadRequest)
 			return
 		}
 	}
 
-	log.WithField("ID", item.ID).Info("Item was requested")
+	slog.Info("Item was requested", slog.String("id", item.ID))
 
 	if item.BurnAfterReading {
-		log.WithField("ID", item.ID).Info("Item will be burned")
+		slog.Info("Item will be burned", slog.String("id", item.ID))
 		if err := serv.store.Delete(item.ID, context.Background()); err != nil {
-			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
+			slog.Error("Failed to delete Item",
+				slog.String("id", item.ID), slog.Any("error", err))
 		}
 	}
 }
 
 func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		log.WithField("method", r.Method).Debug("Request with unsupported method")
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
@@ -297,7 +296,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	reqParts := strings.Split(reqId, "/")
 
 	if len(reqParts) != 3 {
-		log.WithField("request", reqParts).Debug("Requested URL is malformed")
+		slog.Debug("Requested URL is malformed", slog.Any("request", reqParts))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -307,26 +306,26 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 
 	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
-		log.WithField("ID", reqId).Debug("Requested non-existing ID")
+		slog.Debug("Requested non-existing ID", slog.String("id", reqId))
 
 		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
+		slog.Warn("Failed to request", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	if item.DeletionKey != delKey {
-		log.WithField("ID", reqId).Warn("Deletion was requested with invalid key")
+		slog.Warn("Deletion was requested with invalid key", slog.String("id", reqId))
 
 		http.Error(w, msgDeletionKeyWrong, http.StatusForbidden)
 		return
 	}
 
 	if err := serv.store.Delete(item.ID, context.Background()); err != nil {
-		log.WithError(err).WithField("ID", reqId).Error("Requested deletion failed")
+		slog.Error("Failed to delete", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -335,7 +334,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, msgDeletionSuccess)
 
-	log.WithField("ID", reqId).Info("Item was deleted by request")
+	slog.Info("Item was deleted by request", slog.String("id", reqId))
 }
 
 // WebProtocol returns "http" or "https", based either on the X-Forwarded-Proto

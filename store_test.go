@@ -3,12 +3,11 @@ package main
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"os"
 	"reflect"
 	"testing"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // dummyReadCloser wraps around a bytes.Buffer and implements a ReadCloser.
@@ -29,7 +28,10 @@ func (drc dummyReadCloser) Close() error {
 }
 
 func TestStore(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
+	loggerLevel := new(slog.LevelVar)
+	loggerLevel.Set(slog.LevelDebug)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: loggerLevel}))
+	slog.SetDefault(logger)
 
 	item := Item{Expires: time.Now().Add(time.Minute).UTC()}
 	itemDataRaw := []byte("hello world")

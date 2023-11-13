@@ -3,12 +3,12 @@ package main
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/akamensky/base58"
 	"github.com/timshannon/badgerhold/v4"
@@ -22,6 +22,27 @@ const (
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
 // the requested ID.
 var ErrNotFound = errors.New("No Item found for this ID")
+
+// BadgerLogWapper implements badger.Logger to forward logs to log/slog.
+type BadgerLogWapper struct {
+	*slog.Logger
+}
+
+func (logger *BadgerLogWapper) Errorf(f string, args ...interface{}) {
+	logger.Logger.Error(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+}
+
+func (logger *BadgerLogWapper) Warningf(f string, args ...interface{}) {
+	logger.Logger.Warn(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+}
+
+func (logger *BadgerLogWapper) Infof(f string, args ...interface{}) {
+	logger.Logger.Info(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+}
+
+func (logger *BadgerLogWapper) Debugf(f string, args ...interface{}) {
+	logger.Logger.Debug(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+}
 
 // Store stores an index of all Items as well as the pure files.
 type Store struct {
@@ -44,7 +65,7 @@ func NewStore(baseDir string, autoCleanup bool) (s *Store, err error) {
 		cleanup: autoCleanup,
 	}
 
-	log.WithField("directory", baseDir).Info("Opening Store")
+	slog.Info("Opening Store", slog.String("directory", baseDir))
 
 	for _, dir := range []string{baseDir, s.databaseDir(), s.storageDir()} {
 		_, stat := os.Stat(dir)
@@ -54,7 +75,7 @@ func NewStore(baseDir string, autoCleanup bool) (s *Store, err error) {
 
 		err = os.Mkdir(dir, 0700)
 		if err != nil {
-			log.WithField("directory", dir).WithError(err).Error("Cannot create directory")
+			slog.Error("Cannot create directory", slog.String("directory", dir), slog.Any("error", err))
 			return
 		}
 	}
@@ -62,7 +83,7 @@ func NewStore(baseDir string, autoCleanup bool) (s *Store, err error) {
 	opts := badgerhold.DefaultOptions
 	opts.Dir = s.databaseDir()
 	opts.ValueDir = opts.Dir
-	opts.Logger = log.StandardLogger()
+	opts.Logger = &BadgerLogWapper{slog.Default()}
 	opts.Options.BaseLevelSize = 1 << 21    // 2MiB
 	opts.Options.ValueLogFileSize = 1 << 24 // 16MiB
 	opts.Options.BaseTableSize = 1 << 20    // 1MiB
@@ -105,7 +126,7 @@ func (s *Store) cleanupExired() {
 
 		case <-ticker.C:
 			if err := s.deleteExpired(); err != nil {
-				log.WithError(err).Error("Deletion of expired Items failed")
+				slog.Error("Deletion of expired Items failed", slog.Any("error", err))
 			}
 		}
 	}
@@ -147,7 +168,7 @@ func (s *Store) createID() (id string, err error) {
 
 // Close the Store and its database.
 func (s *Store) Close() error {
-	log.Info("Closing Store")
+	slog.Info("Closing Store")
 
 	if s.cleanup {
 		close(s.stopSyn)
@@ -159,27 +180,25 @@ func (s *Store) Close() error {
 
 // Get an Item by its ID. The Item's file can be accessed with GetFile.
 func (s *Store) Get(id string) (i Item, err error) {
-	log.WithField("ID", id).Debug("Requested Item from Store")
+	slog.Debug("Requested Item from Store", slog.String("id", id))
 
 	err = s.bh.Get(id, &i)
 	if err == badgerhold.ErrNotFound {
-		log.WithField("ID", id).Debug("Requested Item was not found")
+		slog.Debug("Requested Item was not found", slog.String("id", id))
 		err = ErrNotFound
 		return
 	} else if err != nil {
-		log.WithField("ID", id).WithError(err).Error("Requested Item failed")
+		slog.Error("Requesting Item failed", slog.String("id", id))
 		return
 	}
 
 	if s.cleanup && i.Expires.Before(time.Now()) {
-		log.WithFields(log.Fields{
-			"ID":      id,
-			"expires": i.Expires,
-		}).Info("Requested Item is expired, will be deleted")
+		slog.Info("Requested Item is expired, will be deleted",
+			slog.String("id", id), slog.Any("expires", i.Expires))
 
 		err = s.Delete(i.ID)
 		if err != nil {
-			log.WithError(err).WithField("ID", id).Error("Deletion of expired Item failed")
+			slog.Error("Failed to delete expired Item", slog.String("id", id), slog.Any("error", err))
 			return
 		}
 
@@ -199,26 +218,28 @@ func (s *Store) GetFile(id string) (*os.File, error) {
 // Both a database entry and a file will be created. The given file will be
 // read into the storage and closed afterwards.
 func (s *Store) Put(i Item, file io.ReadCloser) (id string, err error) {
-	log.Debug("Requested insertion of Item into the Store")
+	slog.Debug("Requested insertion of Item into the Store")
 
 	id, err = s.createID()
 	if err != nil {
-		log.WithError(err).Error("Creation of an ID for a new Item failed")
+		slog.Error("Failed to create an ID for a new Item", slog.Any("error", err))
 		return
 	}
 
 	i.ID = id
-	log.WithField("ID", i.ID).Debug("Insert Item with assigned ID")
+	slog.Debug("Insert Item with assigned ID", slog.String("id", i.ID))
 
 	err = s.bh.Insert(i.ID, i)
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Error("Insertion of an Item into database failed")
+		slog.Error("Failed to insert Item into database",
+			slog.String("id", i.ID), slog.Any("error", err))
 		return
 	}
 
 	f, err := os.Create(filepath.Join(s.storageDir(), i.ID))
 	if err != nil {
-		log.WithField("ID", i.ID).WithError(err).Error("Creation of file failed")
+		slog.Error("Failed to create file",
+			slog.String("id", i.ID), slog.Any("error", err))
 		return
 	}
 
@@ -249,7 +270,7 @@ func (s *Store) deleteExpired() error {
 	}
 
 	for _, i := range items {
-		log.WithField("ID", i.ID).Debug("Delete expired Item")
+		slog.Debug("Delete expired Item", slog.String("id", i.ID))
 		err := s.Delete(i.ID)
 		if err != nil {
 			return err
@@ -261,17 +282,19 @@ func (s *Store) deleteExpired() error {
 
 // Delte an Item. Both the database entry and the file will be removed.
 func (s *Store) Delete(id string) (err error) {
-	log.WithField("ID", id).Debug("Requested deletion of Item")
+	slog.Debug("Requested deletion of Item", slog.String("id", id))
 
 	err = s.bh.Delete(&id, Item{})
 	if err != nil {
-		log.WithField("ID", id).WithError(err).Error("Deletion of Item from database failed")
+		slog.Error("Failed to delete Item from database",
+			slog.String("id", id), slog.Any("error", err))
 		return
 	}
 
 	err = os.Remove(filepath.Join(s.storageDir(), id))
 	if err != nil {
-		log.WithField("ID", id).WithError(err).Error("Deletion of Item from storage failed")
+		slog.Error("Failed to delete Item's file",
+			slog.String("id", id), slog.Any("error", err))
 		return
 	}
 

@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
+	"log/slog"
 	"os"
 	"os/signal"
 	"time"
 
 	"golang.org/x/sys/unix"
 	"gopkg.in/yaml.v3"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Config is the struct representation of gosh's YAML configuration file.
@@ -71,30 +70,36 @@ func loadConfig(path string) (Config, error) {
 func mainMonitor(conf Config) {
 	storeRpcServer, storeRpcClient, err := socketpair()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to create socketpair", slog.Any("error", err))
+		os.Exit(1)
 	}
 	storeFdServer, storeFdClient, err := socketpair()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to create socketpair", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	procStore, err := forkChild("store", []*os.File{storeRpcServer, storeFdServer})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to fork off child", slog.Any("error", err), slog.String("child", "store"))
+		os.Exit(1)
 	}
 
 	procWebserver, err := forkChild("webserver", []*os.File{storeRpcClient, storeFdClient})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to fork off child", slog.Any("error", err), slog.String("child", "webserver"))
+		os.Exit(1)
 	}
 
 	bottomlessPit, err := os.MkdirTemp("", "gosh-monitor-chroot")
 	if err != nil {
-		log.WithError(err).Fatal("Cannot create bottomless pit jail")
+		slog.Error("Failed to create bottomless pit jail", slog.Any("error", err))
+		os.Exit(1)
 	}
 	err = posixPermDrop(bottomlessPit, conf.User, conf.Group)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot drop permissions")
+		slog.Error("Failed to drop permissions", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_linux_seccomp,
@@ -104,7 +109,6 @@ func mainMonitor(conf Config) {
 			"~@clock",
 			"~@cpu-emulation",
 			"~@debug",
-			"~@file-system",
 			"~@keyring",
 			"~@memlock",
 			"~@module",
@@ -118,12 +122,14 @@ func mainMonitor(conf Config) {
 			/* @process */ "~execve", "~execveat", "~fork",
 		})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to apply seccomp-bpf filter", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_openbsd_pledge, "stdio tty proc error", "")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to pledge", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	sigintCh := make(chan os.Signal, 1)
@@ -140,13 +146,13 @@ func mainMonitor(conf Config) {
 
 	select {
 	case <-sigintCh:
-		log.Info("Main process receives SIGINT, shutting down")
+		slog.Info("Main process receives SIGINT, shutting down")
 
 	case <-storeCh:
-		log.Error("The store subprocess has stopped, cleaning up")
+		slog.Error("The store subprocess has stopped, cleaning up")
 
 	case <-webserverCh:
-		log.Error("The web server subprocess has stopped, cleaning up")
+		slog.Error("The web server subprocess has stopped, cleaning up")
 	}
 
 	for i, childProc := range childProcs {
@@ -160,9 +166,27 @@ func mainMonitor(conf Config) {
 	}
 }
 
-func main() {
-	log.SetFormatter(&log.TextFormatter{DisableTimestamp: true})
+// configureLogger sets the default logger with an optional debug log level and
+// JSON encoded output, useful for the forked off childs.
+func configureLogger(debug, jsonOutput bool) {
+	loggerLevel := new(slog.LevelVar)
+	if debug {
+		loggerLevel.Set(slog.LevelDebug)
+	}
 
+	handlerOpts := &slog.HandlerOptions{Level: loggerLevel}
+
+	var logger *slog.Logger
+	if jsonOutput {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, handlerOpts))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stdout, handlerOpts))
+	}
+
+	slog.SetDefault(logger)
+}
+
+func main() {
 	var (
 		flagConfig    string
 		flagForkChild string
@@ -175,13 +199,12 @@ func main() {
 
 	flag.Parse()
 
-	if flagVerbose {
-		log.SetLevel(log.DebugLevel)
-	}
+	configureLogger(flagVerbose, flagForkChild != "")
 
 	conf, err := loadConfig(flagConfig)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot parse YAML configuration")
+		slog.Error("Failed to parse YAML configuration", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	switch flagForkChild {
@@ -195,6 +218,7 @@ func main() {
 		mainMonitor(conf)
 
 	default:
-		log.WithField("fork-child", flagForkChild).Fatal("Unknown child process")
+		slog.Error("Unknown child process identifier", slog.String("name", flagForkChild))
+		os.Exit(1)
 	}
 }
