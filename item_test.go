@@ -94,8 +94,7 @@ func TestItem(t *testing.T) {
 		writer := multipart.NewWriter(buff)
 
 		tmpFileData := make([]byte, test.size)
-		rand.Seed(0)
-		rand.Read(tmpFileData)
+		rand.New(rand.NewSource(0)).Read(tmpFileData)
 
 		if f, err := writer.CreateFormFile(formFile, test.filename); err != nil {
 			t.Fatal(err)
