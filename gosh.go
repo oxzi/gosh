@@ -11,6 +11,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// StaticFileConfig describes a static_files from the YAML and holds its data.
+type StaticFileConfig struct {
+	Path string `yaml:"path"`
+	Mime string `yaml:"mime"`
+
+	data []byte
+}
+
 // Config is the struct representation of gosh's YAML configuration file.
 //
 // For each field's meaning, please consider the gosh.yml file in this
@@ -39,6 +47,10 @@ type Config struct {
 		Protocol string
 
 		UrlPrefix string `yaml:"url_prefix"`
+
+		CustomIndex string `yaml:"custom_index"`
+
+		StaticFiles map[string]StaticFileConfig `yaml:"static_files"`
 
 		ItemConfig struct {
 			MaxSize     string        `yaml:"max_size"`

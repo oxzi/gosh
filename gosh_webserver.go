@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -95,6 +96,43 @@ func mainWebserver(conf Config) {
 
 	storeClient := NewStoreRpcClient(rpcConn, fdConn)
 
+	indexTpl := ""
+	if conf.Webserver.CustomIndex != "" {
+		f, err := os.Open(conf.Webserver.CustomIndex)
+		if err != nil {
+			slog.Error("Failed to open custom index file", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		indexTplRaw, err := io.ReadAll(f)
+		if err != nil {
+			slog.Error("Failed to read custom index file", slog.Any("error", err))
+			os.Exit(1)
+		}
+		_ = f.Close()
+
+		indexTpl = string(indexTplRaw)
+	}
+
+	for k, sfc := range conf.Webserver.StaticFiles {
+		f, err := os.Open(sfc.Path)
+		if err != nil {
+			slog.Error("Failed to open static file",
+				slog.String("file", sfc.Path), slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		sfc.data, err = io.ReadAll(f)
+		if err != nil {
+			slog.Error("Failed to read static file",
+				slog.String("file", sfc.Path), slog.Any("error", err))
+			os.Exit(1)
+		}
+		_ = f.Close()
+
+		conf.Webserver.StaticFiles[k] = sfc
+	}
+
 	maxFilesize, err := ParseBytesize(conf.Webserver.ItemConfig.MaxSize)
 	if err != nil {
 		slog.Error("Failed to parse byte size", slog.Any("error", err))
@@ -159,11 +197,15 @@ func mainWebserver(conf Config) {
 
 	server, err := NewServer(
 		storeClient,
-		maxFilesize, conf.Webserver.ItemConfig.MaxLifetime,
+		maxFilesize,
+		conf.Webserver.ItemConfig.MaxLifetime,
 		conf.Webserver.Contact,
 		mimeDrop,
 		conf.Webserver.ItemConfig.MimeMap,
-		conf.Webserver.UrlPrefix)
+		conf.Webserver.UrlPrefix,
+		indexTpl,
+		conf.Webserver.StaticFiles,
+	)
 	if err != nil {
 		slog.Error("Failed to create webserver", slog.Any("error", err))
 		os.Exit(1)

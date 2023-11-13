@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"html/template"
@@ -17,7 +18,7 @@ import (
 )
 
 //go:embed index.html
-var indexTpl string
+var defaultIndexTpl string
 
 const (
 	msgDeletionKeyWrong  = "Error: Deletion key is incorrect."
@@ -39,6 +40,8 @@ type Server struct {
 	mimeDrop    map[string]struct{}
 	mimeMap     map[string]string
 	urlPrefix   string
+	indexTpl    *template.Template
+	staticFiles map[string]StaticFileConfig
 }
 
 // NewServer creates a new Server with a given database directory, and
@@ -51,7 +54,19 @@ func NewServer(
 	mimeDrop map[string]struct{},
 	mimeMap map[string]string,
 	urlPrefix string,
+	indexTplRaw string,
+	staticFiles map[string]StaticFileConfig,
 ) (s *Server, err error) {
+	indexTpl := defaultIndexTpl
+	if indexTplRaw != "" {
+		indexTpl = indexTplRaw
+	}
+
+	t, err := template.New("index").Parse(indexTpl)
+	if err != nil {
+		return nil, err
+	}
+
 	s = &Server{
 		store:       store,
 		maxSize:     maxSize,
@@ -60,6 +75,8 @@ func NewServer(
 		mimeDrop:    mimeDrop,
 		mimeMap:     mimeMap,
 		urlPrefix:   urlPrefix,
+		indexTpl:    t,
+		staticFiles: staticFiles,
 	}
 	return
 }
@@ -98,6 +115,8 @@ func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serv.handleRoot(w, r)
 	} else if strings.HasPrefix(reqPath, "/del/") {
 		serv.handleDeletion(w, r)
+	} else if stc, ok := serv.staticFiles[reqPath]; ok {
+		serv.handleStaticFile(w, r, stc)
 	} else {
 		serv.handleRequest(w, r)
 	}
@@ -119,14 +138,6 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	t, err := template.New("index").Parse(indexTpl)
-	if err != nil {
-		slog.Error("Failed to parse template", slog.Any("error", err))
-
-		http.Error(w, msgGenericError, http.StatusBadRequest)
-		return
-	}
-
 	data := struct {
 		Expires         string
 		Size            string
@@ -148,8 +159,29 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 
-	if err := t.Execute(w, data); err != nil {
+	if err := serv.indexTpl.Execute(w, data); err != nil {
 		slog.Error("Failed to execute template", slog.Any("error", err))
+	}
+}
+
+func (serv *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, sfc StaticFileConfig) {
+	if r.Method != http.MethodGet {
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
+
+		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", sfc.Mime)
+	w.WriteHeader(http.StatusOK)
+
+	staticReader := bytes.NewReader(sfc.data)
+	_, err := io.Copy(w, staticReader)
+	if err != nil {
+		slog.Error("Failed to write static file back to request", slog.Any("error", err))
+
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
 	}
 }
 
