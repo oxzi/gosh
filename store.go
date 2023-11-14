@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/akamensky/base58"
@@ -58,6 +61,39 @@ func randomIdGenerator(length int) func() (string, error) {
 
 		return string(base58.Encode(idBuff)), nil
 	}
+}
+
+// wordlistIdGenerator returns an ID generator for the "wordlist" type.
+func wordlistIdGenerator(sourceFile string, length int) (func() (string, error), error) {
+	f, err := os.Open(sourceFile)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+
+	words := make([]string, 0, 1024)
+	for scanner.Scan() {
+		words = append(words, scanner.Text())
+	}
+	err = scanner.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return func() (string, error) {
+		parts := make([]string, length)
+		for i := 0; i < length; i++ {
+			n, err := rand.Int(rand.Reader, big.NewInt(int64(len(words))))
+			if err != nil {
+				return "", err
+			}
+			parts[i] = words[int(n.Int64())]
+		}
+
+		return strings.Join(parts, "-"), nil
+	}, nil
 }
 
 // Store stores an index of all Items as well as the pure files.

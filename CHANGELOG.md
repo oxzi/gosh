@@ -24,7 +24,7 @@ Types of changes:
 - Created Store RPC working on Unix domain sockets to allow a `fork`+`exec`ed daemon.
 - Configuration through YAML configuration file.
 - Configurable index template and static files, partially by [@riotbib](https://github.com/riotbib) in [#45](https://github.com/oxzi/gosh/pull/45).
-- Configurable ID length for generated items.
+- ID of new items is now configurable both in length as well as in source (random, wordlist).
 
 ### Changed
 - Dependency version bumps.

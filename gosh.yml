@@ -11,13 +11,19 @@ store:
 
   # id_generator specifies how the ID resp. name of new elements is generated.
   id_generator:
-    # type defines the generator, currently only "random" which generates a
-    # base58-encoded string of length bytes.
+    # type specifies which generator to use:
+    # - "random" which generates a base58-encoded string of $length bytes.
+    # - "wordlist" picks $length words from $file where $file should contain
+    #   one word per line.
     type: "random"
     # length is the ID length.
-    # - For a "random" type, this is the byte length, resulting in
+    # - For the "random" type, this is the byte length, resulting in
     #   2^($length * 8) possible combinations.
+    # - For the "wordlist" type, this is the amount of words, resulting in
+    #   $wordlist_length^$length possible combinations.
     length: 8
+    # file is used as the source for type "wordlist".
+    # file: "/usr/share/dict/words"
 
 
 # The webserver section describes the web server's configuration.

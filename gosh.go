@@ -34,6 +34,7 @@ type Config struct {
 		IdGenerator struct {
 			Type   string `yaml:"type"`
 			Length int    `yaml:"length"`
+			File   string `yaml:"file"`
 		} `yaml:"id_generator"`
 	}
 

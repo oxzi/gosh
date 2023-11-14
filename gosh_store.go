@@ -44,6 +44,14 @@ func mainStore(conf Config) {
 	case "random":
 		idGenerator = randomIdGenerator(conf.Store.IdGenerator.Length)
 
+	case "wordlist":
+		var err error
+		idGenerator, err = wordlistIdGenerator(conf.Store.IdGenerator.File, conf.Store.IdGenerator.Length)
+		if err != nil {
+			slog.Error("Failed to create wordlist ID generator", slog.Any("error", err))
+			os.Exit(1)
+		}
+
 	default:
 		slog.Error("Failed to configure an ID generator as the type is unknown",
 			slog.String("type", conf.Store.IdGenerator.Type))
