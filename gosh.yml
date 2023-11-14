@@ -9,6 +9,16 @@ group: "_gosh"
 store:
   path: "./store"
 
+  # id_generator specifies how the ID resp. name of new elements is generated.
+  id_generator:
+    # type defines the generator, currently only "random" which generates a
+    # base58-encoded string of length bytes.
+    type: "random"
+    # length is the ID length.
+    # - For a "random" type, this is the byte length, resulting in
+    #   2^($length * 8) possible combinations.
+    length: 8
+
 
 # The webserver section describes the web server's configuration.
 #

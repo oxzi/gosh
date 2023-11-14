@@ -39,6 +39,17 @@ func ensureStoreDir(path, username, groupname string) error {
 func mainStore(conf Config) {
 	slog.Debug("Starting store child", slog.Any("config", conf.Store))
 
+	var idGenerator func() (string, error)
+	switch conf.Store.IdGenerator.Type {
+	case "random":
+		idGenerator = randomIdGenerator(conf.Store.IdGenerator.Length)
+
+	default:
+		slog.Error("Failed to configure an ID generator as the type is unknown",
+			slog.String("type", conf.Store.IdGenerator.Type))
+		os.Exit(1)
+	}
+
 	err := ensureStoreDir(conf.Store.Path, conf.User, conf.Group)
 	if err != nil {
 		slog.Error("Failed to prepare store directory", slog.Any("error", err))
@@ -83,7 +94,7 @@ func mainStore(conf Config) {
 		os.Exit(1)
 	}
 
-	store, err := NewStore("/", true)
+	store, err := NewStore("/", idGenerator, true)
 	if err != nil {
 		slog.Error("Failed to create store", slog.Any("error", err))
 		os.Exit(1)

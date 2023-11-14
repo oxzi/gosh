@@ -44,11 +44,29 @@ func (logger *BadgerLogWapper) Debugf(f string, args ...interface{}) {
 	logger.Logger.Debug(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
 }
 
+// randomIdGenerator returns an ID generator for the "random" type.
+func randomIdGenerator(length int) func() (string, error) {
+	return func() (string, error) {
+		// n bytes or randomness, which would be for n = 4:
+		// 4*8 = 32 Bits of randomness; 2^32 = 4 294 967 296 possible combinations
+		idBuff := make([]byte, length)
+
+		_, err := rand.Read(idBuff)
+		if err != nil {
+			return "", err
+		}
+
+		return string(base58.Encode(idBuff)), nil
+	}
+}
+
 // Store stores an index of all Items as well as the pure files.
 type Store struct {
 	baseDir string
 
 	bh *badgerhold.Store
+
+	idGenerator func() (string, error)
 
 	cleanup bool
 	stopSyn chan struct{}
@@ -59,10 +77,15 @@ type Store struct {
 //
 // autoCleanup specifies if both a background cleanup job will be launched as
 // well as deleting expired Items after being retrieved.
-func NewStore(baseDir string, autoCleanup bool) (s *Store, err error) {
+func NewStore(
+	baseDir string,
+	idGenerator func() (string, error),
+	autoCleanup bool,
+) (s *Store, err error) {
 	s = &Store{
-		baseDir: baseDir,
-		cleanup: autoCleanup,
+		baseDir:     baseDir,
+		idGenerator: idGenerator,
+		cleanup:     autoCleanup,
 	}
 
 	slog.Info("Opening Store", slog.String("directory", baseDir))
@@ -132,38 +155,31 @@ func (s *Store) cleanupExired() {
 	}
 }
 
-// createID creates a random ID for a new Item.
-func (s *Store) createID() (id string, err error) {
-	// 4 Bytes of randomness -> 4*8 = 32 Bits of randomness
-	// 2^32 = 4 294 967 296 possible combinations
-	idBuff := make([]byte, 4)
-
+// createID creates an ID for a new Item based on the Store.idGenerator.
+func (s *Store) createID() (string, error) {
 	for i := 0; i < 32; i++ {
-		_, err = rand.Read(idBuff)
+		id, err := s.idGenerator()
 		if err != nil {
-			return
+			return "", err
 		}
 
-		id = string(base58.Encode(idBuff))
-
-		switch bhErr := s.bh.Get(id, Item{}); bhErr {
+		err = s.bh.Get(id, Item{})
+		switch err {
 		case nil:
 			// Continue if this ID is already in use
 			continue
 
 		case badgerhold.ErrNotFound:
 			// Use this ID if there is no such entry
-			return
+			return id, nil
 
 		default:
 			// Otherwise, pass error along
-			err = bhErr
-			return
+			return "", err
 		}
 	}
 
-	err = errors.New("Failed to calculate an ID")
-	return
+	return "", errors.New("failed to calculate a free ID")
 }
 
 // Close the Store and its database.

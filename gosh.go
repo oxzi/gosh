@@ -30,6 +30,11 @@ type Config struct {
 
 	Store struct {
 		Path string
+
+		IdGenerator struct {
+			Type   string `yaml:"type"`
+			Length int    `yaml:"length"`
+		} `yaml:"id_generator"`
 	}
 
 	Webserver struct {
