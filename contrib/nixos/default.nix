@@ -3,13 +3,21 @@
 with lib;
 
 let
-  gosh = pkgs.buildGoModule {
+  
+  # $ sudo nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs-unstable
+  nixpkgsUnstable = import <nixpkgs-unstable> { };
+
+  gosh = nixpkgsUnstable.buildGo121Module {
     name = "gosh";
 
-    src = lib.cleanSource ./.;
-
+    src = pkgs.fetchFromGitHub {
+      owner = "oxzi";
+      repo = "gosh";
+      rev = "a33a40e07dd3c3ce95613076c693331fe988e801";
+      sha256 = "7NeUS952Of/ifjanckpIxKd02Jzja9Y3xu5jX86Ko6A=";
+    };
     # TODO: One has to configure this one.
-    vendorSha256 = "0000000000000000000000000000000000000000000000000000";
+    vendorHash = "sha256-oR613uwIIo5DorSIU4BGH/C6R0scK/9S57RFfwF6iKY=";
 
     CGO_ENABLED = 0;
   };
@@ -20,6 +28,51 @@ let
     map (x: "${x.from} ${x.to}") cfg.mimeMap);
 
   cfg = config.services.gosh;
+
+  goshConfig = pkgs.writeText "gosh.yml" ''
+    ---
+    
+    user: "gosh"
+    group: "gosh"
+    
+    store:
+      path: "${cfg.dataDir}"
+    
+      id_generator:
+        type: "random"
+        length: 8
+    
+    webserver:
+      listen:
+        protocol: "tcp"
+        bound: "${cfg.listenAddress}"
+    
+      protocol: "http"
+    
+      url_prefix: ""
+    
+      # custom_index: "/path/to/alternative/index.html"
+    
+      # static_files:
+      #   "/favicon.ico":
+      #     path: "/path/to/favicon.ico"
+      #     mime: "image/vnd.microsoft.icon"
+      #   "/custom.css":
+      #     path: "/path/to/custom.css"
+      #     mime: "text/css"
+    
+      item_config:
+        max_size: "${cfg.maxFilesize}"
+        max_lifetime: "${cfg.maxLifetime}"
+    
+        mime_drop:
+          - "application/vnd.microsoft.portable-executable"
+          - "application/x-msdownload"
+        mime_map:
+          "text/html": "text/plain"
+    
+      contact: "${cfg.contactMail}"
+    '';
 in {
   options.services.gosh = {
     enable = mkEnableOption "gosh, HTTP file server";
@@ -81,13 +134,7 @@ in {
 
       serviceConfig = {
         ExecStart = ''
-          ${gosh}/bin/goshd \
-            -contact "${cfg.contactMail}" \
-            -listen ${cfg.listenAddress} \
-            -max-filesize ${cfg.maxFilesize} \
-            -max-lifetime ${cfg.maxLifetime} \
-            -mimemap ${mimeMap} \
-            -store ${cfg.dataDir}
+          ${gosh}/bin/gosh -config ${goshConfig} 
         '';
 
         User = "gosh";
@@ -105,7 +152,7 @@ in {
         ReadWritePaths = "${cfg.dataDir}";
         InaccessiblePaths = "/boot /etc /mnt /root -/lost+found";
         NoExecPaths = "/";
-        ExecPaths = "${gosh}/bin/goshd";
+        ExecPaths = "${gosh}/bin/gosh";
 
         PrivateTmp = true;
         PrivateDevices = true;
