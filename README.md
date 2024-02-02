@@ -10,6 +10,7 @@ All files have a maximum lifetime and are then purged.
   - One short YAML file for everything
   - Custom maximum file size and lifetime
   - MIME type filter and rewriting
+  - Templating the index page, also with additional static files
 - __Uploading__
   - Configure a shorter file lifetime for each upload
   - Mark files as burn-after-reading to be deleted after first retrieval

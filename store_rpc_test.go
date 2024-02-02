@@ -257,7 +257,7 @@ func TestStoreRpcSession(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			store, err := NewStore(storageDir, false)
+			store, err := NewStore(storageDir, randomIdGenerator(4), false)
 			if err != nil {
 				t.Fatal(err)
 			}

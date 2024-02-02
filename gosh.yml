@@ -9,6 +9,22 @@ group: "_gosh"
 store:
   path: "./store"
 
+  # id_generator specifies how the ID resp. name of new elements is generated.
+  id_generator:
+    # type specifies which generator to use:
+    # - "random" which generates a base58-encoded string of $length bytes.
+    # - "wordlist" picks $length words from $file where $file should contain
+    #   one word per line.
+    type: "random"
+    # length is the ID length.
+    # - For the "random" type, this is the byte length, resulting in
+    #   2^($length * 8) possible combinations.
+    # - For the "wordlist" type, this is the amount of words, resulting in
+    #   $wordlist_length^$length possible combinations.
+    length: 8
+    # file is used as the source for type "wordlist".
+    # file: "/usr/share/dict/words"
+
 
 # The webserver section describes the web server's configuration.
 #
@@ -38,6 +54,20 @@ webserver:
 
   # url_prefix is an optional prefix in URL to be used, e.g., "/gosh"
   url_prefix: ""
+
+  # custom_index will be used instead of the compiled in index.html template.
+  # For starters, copy the index.html from the repository somewhere nice.
+  custom_index: "/path/to/alternative/index.html"
+
+  # static_files to be read during startup and returned instead of being passed
+  # against the store's database. This might be used for custom resources.
+  static_files:
+    "/favicon.ico":
+      path: "/path/to/favicon.ico"
+      mime: "image/vnd.microsoft.icon"
+    "/custom.css":
+      path: "/path/to/custom.css"
+      mime: "text/css"
 
   # item_config sets restrictions for new items, e.g., their max_size, in bytes
   # or suffixed with a unit, and max_lifetime, as a Go duration. Furthermore,

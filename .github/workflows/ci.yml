@@ -10,12 +10,12 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20', '1.21' ]
+        go: [ '1.21' ]
 
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go }}
 
@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.19', '1.20', '1.21' ]
+        go: [ '1.21' ]
         goos: [ 'freebsd', 'linux', 'openbsd' ]
 
     env:
@@ -45,7 +45,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go }}
 

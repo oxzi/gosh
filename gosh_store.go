@@ -1,10 +1,9 @@
 package main
 
 import (
+	"log/slog"
 	"os"
 	"os/signal"
-
-	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/sys/unix"
 )
@@ -38,16 +37,37 @@ func ensureStoreDir(path, username, groupname string) error {
 }
 
 func mainStore(conf Config) {
-	log.WithField("config", conf.Store).Debug("Starting store child")
+	slog.Debug("Starting store child", slog.Any("config", conf.Store))
+
+	var idGenerator func() (string, error)
+	switch conf.Store.IdGenerator.Type {
+	case "random":
+		idGenerator = randomIdGenerator(conf.Store.IdGenerator.Length)
+
+	case "wordlist":
+		var err error
+		idGenerator, err = wordlistIdGenerator(conf.Store.IdGenerator.File, conf.Store.IdGenerator.Length)
+		if err != nil {
+			slog.Error("Failed to create wordlist ID generator", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+	default:
+		slog.Error("Failed to configure an ID generator as the type is unknown",
+			slog.String("type", conf.Store.IdGenerator.Type))
+		os.Exit(1)
+	}
 
 	err := ensureStoreDir(conf.Store.Path, conf.User, conf.Group)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot prepare store directory")
+		slog.Error("Failed to prepare store directory", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = posixPermDrop(conf.Store.Path, conf.User, conf.Group)
 	if err != nil {
-		log.WithError(err).Fatal("Cannot drop permissions")
+		slog.Error("Failed to drop permissions", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_linux_seccomp,
@@ -70,28 +90,33 @@ func mainStore(conf Config) {
 			/* @network-io */ "~bind", "~connect", "~listen",
 		})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to apply seccomp-bpf filter", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	err = restrict(restrict_openbsd_pledge,
 		"stdio rpath wpath cpath flock unix sendfd recvfd error",
 		"")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to pledge", slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	store, err := NewStore("/", true)
+	store, err := NewStore("/", idGenerator, true)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to create store", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	rpcConn, err := unixConnFromFile(os.NewFile(3, ""))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to create Unix Domain Socket from FD", slog.Any("error", err))
+		os.Exit(1)
 	}
 	fdConn, err := unixConnFromFile(os.NewFile(4, ""))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to create Unix Domain Socket from FD", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	rpcStore := NewStoreRpcServer(store, rpcConn, fdConn)
@@ -102,6 +127,7 @@ func mainStore(conf Config) {
 
 	err = rpcStore.Close()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to close RPC Store", slog.Any("error", err))
+		os.Exit(1)
 	}
 }

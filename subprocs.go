@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
-
-	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/sys/unix"
 )
@@ -50,7 +51,7 @@ func socketpair() (parent, child *os.File, err error) {
 // The child process' output will be printed to this process' output. The
 // extraFiles are additional file descriptors for communication.
 func forkChild(child string, extraFiles []*os.File) (*os.Process, error) {
-	logParent, logChild, err := socketpair()
+	logParent, logChild, err := pipe2()
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +59,46 @@ func forkChild(child string, extraFiles []*os.File) (*os.Process, error) {
 	go func() {
 		scanner := bufio.NewScanner(logParent)
 		for scanner.Scan() {
-			log.WithField("subprocess", child).Print(scanner.Text())
-			if err := scanner.Err(); err != nil {
-				log.WithField("subprocess", child).WithError(err).Error("Scanner failed")
+			childLogEntry := scanner.Text()
+			childLogRecord := make(map[string]any)
+
+			err := json.Unmarshal([]byte(childLogEntry), &childLogRecord)
+			if err != nil {
+				slog.Warn("Unparsable child message",
+					slog.String("child", child), slog.String("msg", childLogEntry),
+					slog.Any("error", err))
+				continue
 			}
+
+			logger := slog.With(slog.String("child", child))
+			for k, v := range childLogRecord {
+				switch k {
+				case "time", "level", "msg":
+				default:
+					logger = logger.With(slog.Any(k, v))
+				}
+			}
+
+			levelVal, ok := childLogRecord["level"]
+			if !ok {
+				slog.Warn("Child messages misses level",
+					slog.String("child", child), slog.String("msg", childLogEntry))
+				continue
+			}
+
+			level := new(slog.Level)
+			err = level.UnmarshalText([]byte(levelVal.(string)))
+			if err != nil {
+				slog.Warn("Failed to parse child's log level",
+					slog.String("child", child), slog.String("msg", childLogEntry),
+					slog.Any("error", err))
+				continue
+			}
+
+			logger.Log(context.Background(), *level, childLogRecord["msg"].(string))
+		}
+		if err := scanner.Err(); err != nil {
+			slog.Error("Scanner failed", slog.Any("error", err))
 		}
 	}()
 

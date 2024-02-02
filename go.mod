@@ -1,20 +1,17 @@
 module github.com/oxzi/gosh
 
-go 1.19
+go 1.21
 
 require (
 	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
 	github.com/oxzi/syscallset-go v0.1.5
-	github.com/sirupsen/logrus v1.9.3
 	github.com/timshannon/badgerhold/v4 v4.0.3
-	golang.org/x/sys v0.14.0
+	golang.org/x/sys v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/dgraph-io/badger/v3 v3.2103.5 // indirect
 	github.com/dgraph-io/badger/v4 v4.1.0 // indirect
 	github.com/dgraph-io/ristretto v0.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/fcgi"
@@ -13,12 +15,10 @@ import (
 	"time"
 
 	_ "embed"
-
-	log "github.com/sirupsen/logrus"
 )
 
 //go:embed index.html
-var indexTpl string
+var defaultIndexTpl string
 
 const (
 	msgDeletionKeyWrong  = "Error: Deletion key is incorrect."
@@ -37,21 +37,46 @@ type Server struct {
 	maxSize     int64
 	maxLifetime time.Duration
 	contactMail string
-	mimeMap     MimeMap
+	mimeDrop    map[string]struct{}
+	mimeMap     map[string]string
 	urlPrefix   string
+	indexTpl    *template.Template
+	staticFiles map[string]StaticFileConfig
 }
 
 // NewServer creates a new Server with a given database directory, and
 // configuration values. The Server must be started as an http.Handler.
-func NewServer(store *StoreRpcClient, maxSize int64, maxLifetime time.Duration,
-	contactMail string, mimeMap MimeMap, urlPrefix string) (s *Server, err error) {
+func NewServer(
+	store *StoreRpcClient,
+	maxSize int64,
+	maxLifetime time.Duration,
+	contactMail string,
+	mimeDrop map[string]struct{},
+	mimeMap map[string]string,
+	urlPrefix string,
+	indexTplRaw string,
+	staticFiles map[string]StaticFileConfig,
+) (s *Server, err error) {
+	indexTpl := defaultIndexTpl
+	if indexTplRaw != "" {
+		indexTpl = indexTplRaw
+	}
+
+	t, err := template.New("index").Parse(indexTpl)
+	if err != nil {
+		return nil, err
+	}
+
 	s = &Server{
 		store:       store,
 		maxSize:     maxSize,
 		maxLifetime: maxLifetime,
 		contactMail: contactMail,
+		mimeDrop:    mimeDrop,
 		mimeMap:     mimeMap,
 		urlPrefix:   urlPrefix,
+		indexTpl:    t,
+		staticFiles: staticFiles,
 	}
 	return
 }
@@ -90,6 +115,8 @@ func (serv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serv.handleRoot(w, r)
 	} else if strings.HasPrefix(reqPath, "/del/") {
 		serv.handleDeletion(w, r)
+	} else if stc, ok := serv.staticFiles[reqPath]; ok {
+		serv.handleStaticFile(w, r, stc)
 	} else {
 		serv.handleRequest(w, r)
 	}
@@ -104,21 +131,13 @@ func (serv *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		serv.handleUpload(w, r)
 
 	default:
-		log.WithField("method", r.Method).Debug("Called with unsupported method")
+		slog.Debug("Called with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 	}
 }
 
 func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	t, err := template.New("index").Parse(indexTpl)
-	if err != nil {
-		log.WithError(err).Error("Failed to parse template")
-
-		http.Error(w, msgGenericError, http.StatusBadRequest)
-		return
-	}
-
 	data := struct {
 		Expires         string
 		Size            string
@@ -140,30 +159,51 @@ func (serv *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 
-	if err := t.Execute(w, data); err != nil {
-		log.WithError(err).Error("Failed to execute template")
+	if err := serv.indexTpl.Execute(w, data); err != nil {
+		slog.Error("Failed to execute template", slog.Any("error", err))
+	}
+}
+
+func (serv *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, sfc StaticFileConfig) {
+	if r.Method != http.MethodGet {
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
+
+		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", sfc.Mime)
+	w.WriteHeader(http.StatusOK)
+
+	staticReader := bytes.NewReader(sfc.data)
+	_, err := io.Copy(w, staticReader)
+	if err != nil {
+		slog.Error("Failed to write static file back to request", slog.Any("error", err))
+
+		http.Error(w, msgGenericError, http.StatusBadRequest)
+		return
 	}
 }
 
 func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	item, f, err := NewItemFromRequest(r, serv.maxSize, serv.maxLifetime)
 	if err == ErrLifetimeTooLong {
-		log.Info("New Item with a too long lifetime was rejected")
+		slog.Info("New Item with a too long lifetime was rejected")
 
 		http.Error(w, msgLifetimeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err == ErrFileTooBig {
-		log.Info("New Item with a too great file size was rejected")
+		slog.Info("New Item with a too great file size was rejected")
 
 		http.Error(w, msgFileSizeExceeds, http.StatusNotAcceptable)
 		return
 	} else if err != nil {
-		log.WithError(err).Error("Failed to create new Item")
+		slog.Error("Failed to create new Item", slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
-	} else if serv.mimeMap.MustDrop(item.ContentType) {
-		log.WithField("MIME", item.ContentType).Info("Prevented upload of an illegal MIME")
+	} else if _, drop := serv.mimeDrop[item.ContentType]; drop {
+		slog.Info("Prevented upload of an illegal MIME", slog.String("mime", item.ContentType))
 
 		http.Error(w, msgIllegalMime, http.StatusBadRequest)
 		return
@@ -171,16 +211,14 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	itemId, err := serv.store.Put(item, f, context.Background())
 	if err != nil {
-		log.WithError(err).Error("Failed to store Item")
+		slog.Error("Failed to store Item", slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"ID":      itemId,
-		"expires": item.Expires,
-	}).Info("Uploaded new Item")
+	slog.Info("Uploaded new Item",
+		slog.String("id", itemId), slog.Any("expires", item.Expires))
 
 	w.WriteHeader(http.StatusOK)
 
@@ -217,9 +255,9 @@ func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, i
 
 	defer f.Close()
 
-	mimeType, err := serv.mimeMap.Substitute(item.ContentType)
-	if err != nil {
-		return fmt.Errorf("substituting MIME failed: %v", err)
+	mimeType := item.ContentType
+	if mimeSubst, ok := serv.mimeMap[mimeType]; ok {
+		mimeType = mimeSubst
 	}
 
 	w.Header().Set("Content-Type", mimeType)
@@ -239,7 +277,7 @@ func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, i
 
 func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		log.WithField("method", r.Method).Debug("Request with unsupported method")
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
@@ -250,43 +288,45 @@ func (serv *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
-		log.WithField("ID", reqId).Debug("Requested non-existing ID")
+		slog.Debug("Requested non-existing ID", slog.String("id", reqId))
 
 		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
+		slog.Warn("Failed to request", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	if serv.hasClientCachedRequest(r, item) {
-		log.WithField("ID", reqId).Debug("Requested with conditional GET; HTTP Status Code 304")
+		slog.Debug("Requested with conditional GET; HTTP Status Code 304", slog.String("id", reqId))
 		w.WriteHeader(http.StatusNotModified)
 	} else {
 		err := serv.handleRequestServe(w, r, item)
 		if err != nil {
-			log.WithError(err).WithField("ID", reqId).Warn("Serving the request failed")
+			slog.Warn("Failed to serve request",
+				slog.Any("error", err), slog.String("id", reqId))
 
 			http.Error(w, msgGenericError, http.StatusBadRequest)
 			return
 		}
 	}
 
-	log.WithField("ID", item.ID).Info("Item was requested")
+	slog.Info("Item was requested", slog.String("id", item.ID))
 
 	if item.BurnAfterReading {
-		log.WithField("ID", item.ID).Info("Item will be burned")
+		slog.Info("Item will be burned", slog.String("id", item.ID))
 		if err := serv.store.Delete(item.ID, context.Background()); err != nil {
-			log.WithError(err).WithField("ID", item.ID).Error("Deletion failed")
+			slog.Error("Failed to delete Item",
+				slog.String("id", item.ID), slog.Any("error", err))
 		}
 	}
 }
 
 func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		log.WithField("method", r.Method).Debug("Request with unsupported method")
+		slog.Debug("Request with unsupported method", slog.String("method", r.Method))
 
 		http.Error(w, msgUnsupportedMethod, http.StatusMethodNotAllowed)
 		return
@@ -297,7 +337,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	reqParts := strings.Split(reqId, "/")
 
 	if len(reqParts) != 3 {
-		log.WithField("request", reqParts).Debug("Requested URL is malformed")
+		slog.Debug("Requested URL is malformed", slog.Any("request", reqParts))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -307,26 +347,26 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 
 	item, err := serv.store.Get(reqId, context.Background())
 	if err == ErrNotFound {
-		log.WithField("ID", reqId).Debug("Requested non-existing ID")
+		slog.Debug("Requested non-existing ID", slog.String("id", reqId))
 
 		http.Error(w, msgNotExists, http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.WithError(err).WithField("ID", reqId).Warn("Requesting failed")
+		slog.Warn("Failed to request", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
 	}
 
 	if item.DeletionKey != delKey {
-		log.WithField("ID", reqId).Warn("Deletion was requested with invalid key")
+		slog.Warn("Deletion was requested with invalid key", slog.String("id", reqId))
 
 		http.Error(w, msgDeletionKeyWrong, http.StatusForbidden)
 		return
 	}
 
 	if err := serv.store.Delete(item.ID, context.Background()); err != nil {
-		log.WithError(err).WithField("ID", reqId).Error("Requested deletion failed")
+		slog.Error("Failed to delete", slog.String("id", reqId), slog.Any("error", err))
 
 		http.Error(w, msgGenericError, http.StatusBadRequest)
 		return
@@ -335,7 +375,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, msgDeletionSuccess)
 
-	log.WithField("ID", reqId).Info("Item was deleted by request")
+	slog.Info("Item was deleted by request", slog.String("id", reqId))
 }
 
 // WebProtocol returns "http" or "https", based either on the X-Forwarded-Proto
