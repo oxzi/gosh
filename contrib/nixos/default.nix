@@ -4,20 +4,17 @@ with lib;
 
 let
   
-  # $ sudo nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs-unstable
-  nixpkgsUnstable = import <nixpkgs-unstable> { };
-
-  gosh = nixpkgsUnstable.buildGo121Module {
+  gosh = pkgs.buildGoModule {
     name = "gosh";
 
     src = pkgs.fetchFromGitHub {
       owner = "oxzi";
       repo = "gosh";
-      rev = "a33a40e07dd3c3ce95613076c693331fe988e801";
-      sha256 = "7NeUS952Of/ifjanckpIxKd02Jzja9Y3xu5jX86Ko6A=";
+      rev = "89b614613232e1fa89db5112c3a72aaf7c160916";
+      sha256 = "sha256-Krd3YP9YFZ0f6PsM4xH2IN9RiZo9oxVKRUmp8ITpsl4=";
     };
     # TODO: One has to configure this one.
-    vendorHash = "sha256-oR613uwIIo5DorSIU4BGH/C6R0scK/9S57RFfwF6iKY=";
+    vendorHash = "sha256-TcrUG8k/SxDqXgnzYqS1hWNAnAHswbWuBoQ+nSYdBBk=";
 
     CGO_ENABLED = 0;
   };
