@@ -173,9 +173,9 @@ server "example.org" {
 
 Don't forget to `rcctl reload httpd` your configuration changes.
 
-### docker
+### Docker
 
-Simply clone repo, alter gosh.yaml according to your needs and build container with contrib/docker/dockerfile
+Clone repo, alter gosh.yaml according to your needs and build container with contrib/docker/dockerfile
 
 or 
 
