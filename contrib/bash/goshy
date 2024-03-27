@@ -9,6 +9,7 @@ Options:
   -i --instance          Complete URL to the gosh instance.
   -p --period TIMEFRAME  Set a custom expiry period.
   -u --only-url          Print only URL as response.
+  -q --qr-code           Print only QR code as response.
 EOF
 }
 
@@ -37,6 +38,10 @@ while :; do
       ONLYURL="1"
       ;;
 
+    -q|--qr-code)
+      QRCODE="1"
+      ;;
+
     *)
       FILE=$1
       break
@@ -55,7 +60,7 @@ if [ -z "$GOSH_INSTANCE" ]; then
   exit 1
 fi
 
-CURL_CMD="curl -F 'file=@${FILE}'"
+CURL_CMD="curl -s -F 'file=@${FILE}'"
 if [[ -n ${BURN+x} ]]; then
   CURL_CMD="${CURL_CMD} -F 'burn=1'"
 fi
@@ -63,8 +68,10 @@ if [[ -n ${PERIOD+x} ]]; then
   CURL_CMD="${CURL_CMD} -F 'time=${PERIOD}'"
 fi
 CURL_CMD="${CURL_CMD} ${GOSH_INSTANCE}"
-if [[ -n ${ONLYURL+x} ]]; then
+if [[ -n ${ONLYURL+x} ]] || [[ -n ${QRCODE+x} ]]; then
   CURL_CMD="${CURL_CMD}/?onlyURL"
 fi
-
+if [[ -n ${QRCODE+x} ]]; then
+  CURL_CMD="${CURL_CMD} | qrencode -t UTF8"
+fi
 eval "$CURL_CMD"
