@@ -23,7 +23,7 @@ jobs:
     - run: go build ./...
     - run: go test -race -v ./...
 
-    - uses: golangci/golangci-lint-action@v4
+    - uses: golangci/golangci-lint-action@v5
       with:
         skip-pkg-cache: true
         skip-build-cache: true
