@@ -88,6 +88,7 @@ func mainStore(conf Config) {
 			"~@swap",
 			/* @process */ "~execve", "~execveat", "~fork", "~kill",
 			/* @network-io */ "~bind", "~connect", "~listen",
+			"fstatat", // for aarch64, same as newfstatat
 		})
 	if err != nil {
 		slog.Error("Failed to apply seccomp-bpf filter", slog.Any("error", err))
