@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gosh.fullname" . }}-config
+  labels:
+    app: {{ include "gosh.name" . }}
+    chart: {{ include "gosh.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  gosh.yml: |
+    # user and group will be the system user and group to drop permissions to.
+    user: "{{ .Values.user | default "_gosh" }}"
+    group: "{{ .Values.group | default "_gosh" }}"
+
+    # The store section describes the storage server's configuration.
+    store:
+      path: "{{ .Values.store.path | default "/store" }}"
+
+      # id_generator specifies how the ID resp. name of new elements is generated.
+      id_generator:
+        # type specifies which generator to use:
+        # - "random" which generates a base58-encoded string of $length bytes.
+        # - "wordlist" picks $length words from $file where $file should contain
+        #   one word per line.
+        type: "{{ .Values.store.id_generator.type | default "random" }}"
+        length: {{ .Values.store.id_generator.length | default 8 }}
+
+    # The webserver section describes the web server's configuration.
+    webserver:
+      listen:
+        protocol: "{{ .Values.webserver.listen.protocol }}"
+        bound: "{{ .Values.webserver.listen.bound }}"
+      protocol: "{{ .Values.webserver.protocol }}"
+      url_prefix: "{{ .Values.webserver.url_prefix }}"
+
+      item_config:
+        max_size: "{{ .Values.webserver.item_config.max_size }}"
+        max_lifetime: "{{ .Values.webserver.item_config.max_lifetime }}"
+        mime_drop:
+          {{- range .Values.webserver.item_config.mime_drop }}
+          - "{{ . }}"
+          {{- end }}
+        mime_map:
+          {{- range $key, $value := .Values.webserver.item_config.mime_map }}
+          "{{ $key }}": "{{ $value }}"
+          {{- end }}
+
+      contact: "{{ .Values.webserver.contact }}"
+
