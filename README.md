@@ -173,6 +173,30 @@ server "example.org" {
 
 Don't forget to `rcctl reload httpd` your configuration changes.
 
+### Docker
+
+Clone repo, alter gosh.yaml according to your needs and build container with contrib/docker/dockerfile
+
+or 
+
+use provided image from dockerhub 
+
+``` docker-compose
+version: "3.8"
+services:
+  gosh:
+    image: gorja/gosh:0.6.0
+    restart: unless-stopped
+    ports:
+      - 8080:80
+```
+
+or if you prefer docker run command
+
+``` docker run
+docker run -p 8080:80 gorja/gosh:0.6.0 
+```
+
 
 ## Running gosh
 
