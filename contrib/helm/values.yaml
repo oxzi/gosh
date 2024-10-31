@@ -49,7 +49,7 @@ webserver:
 replicaCount: 1
 
 image:
-  repository: docker.io/rehwanne/gosh
+  repository: ghcr.io/rehwanne/gosh
   #pullPolicy: IfNotPresent
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
