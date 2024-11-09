@@ -52,13 +52,17 @@ spec:
           - name: config-volume
             mountPath: "/gosh.yml"
             subPath: "gosh.yml"
+          - name: tmp-volume
+            mountPath: /tmp
           {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
         - name: config-volume
           configMap:
-            name: gosh-config
+            name: {{ include "gosh.fullname" . }}-config
+        - name: tmp-volume
+          emptyDir: {}
         - name: store
       {{- if .Values.store.persistence.enabled }}
           persistentVolumeClaim:

@@ -50,8 +50,9 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/rehwanne/gosh
-  #pullPolicy: IfNotPresent
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
+  #pullPolicy: Always
+  #
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -76,11 +77,11 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext: 
   # capabilities:
   #   drop:
   #   - ALL
-  # readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
 
