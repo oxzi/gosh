@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.21', '1.22', 'stable' ]
+        go: [ 'oldstable', 'stable' ]
 
     steps:
     - uses: actions/checkout@v4
@@ -23,10 +23,7 @@ jobs:
     - run: go build ./...
     - run: go test -race -v ./...
 
-    - uses: golangci/golangci-lint-action@v4
-      with:
-        skip-pkg-cache: true
-        skip-build-cache: true
+    - uses: golangci/golangci-lint-action@v6
 
 
   golang_cross:
@@ -36,7 +33,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.21', '1.22', 'stable' ]
+        go: [ 'oldstable', 'stable' ]
         goos: [ 'freebsd', 'linux', 'openbsd' ]
 
     env:
