@@ -1,0 +1,54 @@
+---
+# Container configuration for gosh
+#
+# Mount structure:
+#   /config/gosh.yml      - this file
+#   /config/index.html    - custom index template (optional)
+#   /config/favicon.ico   - favicon (optional)
+#   /config/custom.css    - custom styles (optional)
+#   /data/                - persistent storage
+
+user: "gosh"
+group: "gosh"
+
+store:
+  path: "/data/store"
+
+  id_generator:
+    type: "random"
+    length: 8
+
+webserver:
+  listen:
+    protocol: "tcp"
+    bound: ":8080"
+
+  protocol: "http"
+
+  url_prefix: ""
+
+  # Optional: custom index.html template
+  # Uncomment if you provide /config/index.html
+  # custom_index: "/config/index.html"
+
+  # Optional: static files served by gosh
+  # Uncomment and adjust as needed
+  # static_files:
+  #   "/favicon.ico":
+  #     path: "/config/favicon.ico"
+  #     mime: "image/vnd.microsoft.icon"
+  #   "/custom.css":
+  #     path: "/config/custom.css"
+  #     mime: "text/css"
+
+  item_config:
+    max_size: "10MiB"
+    max_lifetime: "24h"
+
+    mime_drop:
+      - "application/vnd.microsoft.portable-executable"
+      - "application/x-msdownload"
+    mime_map:
+      "text/html": "text/plain"
+
+  contact: "admin@example.com"

@@ -1,0 +1,17 @@
+services:
+  gosh:
+    build:
+      context: ../..
+      dockerfile: contrib/docker/Dockerfile
+    image: gosh:distroless
+    ports:
+      - "8080:8080"
+    volumes:
+      # Config directory with gosh.yml and optional static files
+      - ./config:/config:ro
+      # Persistent data storage
+      - gosh-data:/data
+    restart: unless-stopped
+
+volumes:
+  gosh-data:
