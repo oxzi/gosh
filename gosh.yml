@@ -57,17 +57,17 @@ webserver:
 
   # custom_index will be used instead of the compiled in index.html template.
   # For starters, copy the index.html from the repository somewhere nice.
-  custom_index: "/path/to/alternative/index.html"
+  # custom_index: "/path/to/alternative/index.html"
 
   # static_files to be read during startup and returned instead of being passed
   # against the store's database. This might be used for custom resources.
-  static_files:
-    "/favicon.ico":
-      path: "/path/to/favicon.ico"
-      mime: "image/vnd.microsoft.icon"
-    "/custom.css":
-      path: "/path/to/custom.css"
-      mime: "text/css"
+  # static_files:
+  #   "/favicon.ico":
+  #     path: "/path/to/favicon.ico"
+  #     mime: "image/vnd.microsoft.icon"
+  #   "/custom.css":
+  #     path: "/path/to/custom.css"
+  #     mime: "text/css"
 
   # item_config sets restrictions for new items, e.g., their max_size, in bytes
   # or suffixed with a unit, and max_lifetime, as a Go duration. Furthermore,
