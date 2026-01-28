@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 
 	"golang.org/x/sys/unix"
 )
@@ -37,7 +38,7 @@ func ensureStoreDir(path, username, groupname string) error {
 }
 
 func mainStore(conf Config) {
-	slog.Debug("Starting store child", slog.Any("config", conf.Store))
+	slog.Debug("Starting store child", slog.Any("config", conf.Store), slog.String("arch", runtime.GOARCH))
 
 	var idGenerator func() (string, error)
 	switch conf.Store.IdGenerator.Type {
@@ -70,26 +71,31 @@ func mainStore(conf Config) {
 		os.Exit(1)
 	}
 
-	err = restrict(restrict_linux_seccomp,
-		[]string{
-			"@system-service",
-			"~@chown",
-			"~@clock",
-			"~@cpu-emulation",
-			"~@debug",
-			"~@keyring",
-			"~@memlock",
-			"~@module",
-			"~@mount",
-			"~@privileged",
-			"~@reboot",
-			"~@sandbox",
-			"~@setuid",
-			"~@swap",
-			/* @process */ "~execve", "~execveat", "~fork", "~kill",
-			/* @network-io */ "~bind", "~connect", "~listen",
-			"fstatat", // for aarch64, same as newfstatat
-		})
+	seccompFilter := []string{
+		"@system-service",
+		"~@chown",
+		"~@clock",
+		"~@cpu-emulation",
+		"~@debug",
+		"~@keyring",
+		"~@memlock",
+		"~@module",
+		"~@mount",
+		"~@privileged",
+		"~@reboot",
+		"~@sandbox",
+		"~@setuid",
+		"~@swap",
+		/* @process */ "~execve", "~execveat", "~fork", "~kill",
+		/* @network-io */ "~bind", "~connect", "~listen",
+	}
+	// fstatat syscall name differs per architecture
+	if runtime.GOARCH == "arm64" {
+		seccompFilter = append(seccompFilter, "fstatat")
+	} else {
+		seccompFilter = append(seccompFilter, "newfstatat")
+	}
+	err = restrict(restrict_linux_seccomp, seccompFilter)
 	if err != nil {
 		slog.Error("Failed to apply seccomp-bpf filter", slog.Any("error", err))
 		os.Exit(1)
