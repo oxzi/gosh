@@ -84,9 +84,9 @@ type Item struct {
 }
 
 var (
-	ErrLifetimeTooLong = errors.New("Lifetime is greater than maximum lifetime")
+	ErrLifetimeTooLong = errors.New("lifetime is greater than maximum lifetime")
 
-	ErrFileTooBig = errors.New("File size is greater than maxium filesize")
+	ErrFileTooBig = errors.New("file size is greater than maxium filesize")
 
 	filenamePattern = regexp.MustCompile(`[^0-9A-Za-z-_.]`)
 )
@@ -112,7 +112,7 @@ func NewItemFromRequest(r *http.Request, maxSize int64, maxLifetime time.Duratio
 	defer func() {
 		if err != nil {
 			item = Item{}
-			file.Close()
+			_ = file.Close()
 			file = nil
 		}
 	}()

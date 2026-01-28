@@ -41,7 +41,7 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(storageDir)
+	defer func() { _ = os.RemoveAll(storageDir) }()
 
 	store, err := NewStore(storageDir, randomIdGenerator(4), false)
 	if err != nil {
@@ -72,7 +72,9 @@ func TestStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(n, err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
 		buff = buff[:n]
 
 		if !bytes.Equal(itemDataRaw, buff) {
@@ -109,7 +111,7 @@ func TestStoreCreateId(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(storageDir)
+	defer func() { _ = os.RemoveAll(storageDir) }()
 
 	store, err := NewStore(storageDir, randomIdGenerator(4), false)
 	if err != nil {

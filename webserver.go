@@ -226,13 +226,13 @@ func (serv *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	onlyUrl := r.URL.Query().Has("onlyURL")
 
 	if onlyUrl {
-		fmt.Fprintf(w, "%s/%s\n", baseUrl, itemId)
+		_, _ = fmt.Fprintf(w, "%s/%s\n", baseUrl, itemId)
 	} else {
-		fmt.Fprintf(w, "Fetch:   %s/%s\n", baseUrl, itemId)
-		fmt.Fprintf(w, "Delete:  %s/del/%s/%s\n", baseUrl, itemId, item.DeletionKey)
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "Expires: %v\n", item.Expires)
-		fmt.Fprintf(w, "Burn:    %t\n", item.BurnAfterReading)
+		_, _ = fmt.Fprintf(w, "Fetch:   %s/%s\n", baseUrl, itemId)
+		_, _ = fmt.Fprintf(w, "Delete:  %s/del/%s/%s\n", baseUrl, itemId, item.DeletionKey)
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "Expires: %v\n", item.Expires)
+		_, _ = fmt.Fprintf(w, "Burn:    %t\n", item.BurnAfterReading)
 	}
 }
 
@@ -253,7 +253,7 @@ func (serv *Server) handleRequestServe(w http.ResponseWriter, r *http.Request, i
 		return fmt.Errorf("reading file failed: %v", err)
 	}
 
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	mimeType := item.ContentType
 	if mimeSubst, ok := serv.mimeMap[mimeType]; ok {
@@ -373,7 +373,7 @@ func (serv *Server) handleDeletion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, msgDeletionSuccess)
+	_, _ = fmt.Fprintln(w, msgDeletionSuccess)
 
 	slog.Info("Item was deleted by request", slog.String("id", reqId))
 }

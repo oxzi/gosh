@@ -156,7 +156,7 @@ func (client *StoreRpcClient) Get(id string, ctx context.Context) (Item, error) 
 	err := client.call("Get", id, &item, ctx)
 
 	// The original error type gets lost..
-	if err != nil && err.Error() == "No Item found for this ID" {
+	if err != nil && err.Error() == ErrNotFound.Error() {
 		err = ErrNotFound
 	}
 
@@ -169,7 +169,7 @@ func (server *StoreRpcServer) GetFile(id string, _ *int) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	err = sendFd(f, server.fdConn)
 	if err != nil {

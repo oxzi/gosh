@@ -210,7 +210,7 @@ func mainWebserver(conf Config) {
 		slog.Error("Failed to create webserver", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	sigintCh := make(chan os.Signal, 1)
 	signal.Notify(sigintCh, unix.SIGINT)

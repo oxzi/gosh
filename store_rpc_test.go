@@ -64,7 +64,9 @@ func testStoreRpcSessionGetFile(t *testing.T, server *StoreRpcServer, client *St
 		if err != nil {
 			t.Error(n, err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
 		buff = buff[:n]
 
 		if !bytes.Equal(itemDataRaw, buff) {
@@ -110,7 +112,9 @@ func testStoreRpcSessionPut(size int) func(*testing.T, *StoreRpcServer, *StoreRp
 			if err != nil {
 				t.Error(n, err)
 			}
-			f.Close()
+			if err := f.Close(); err != nil {
+				t.Error(err)
+			}
 			buff = buff[:n]
 
 			if !bytes.Equal(itemDataRaw, buff) {
@@ -182,7 +186,9 @@ func testStoreRpcSessionSession(t *testing.T, server *StoreRpcServer, client *St
 		if err != nil {
 			t.Error(n, err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
 		buff = buff[:n]
 
 		if !bytes.Equal(itemDataRaw, buff) {

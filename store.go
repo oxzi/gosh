@@ -24,7 +24,7 @@ const (
 
 // ErrNotFound is returned by the `Store.Get` method if there is no Item for
 // the requested ID.
-var ErrNotFound = errors.New("No Item found for this ID")
+var ErrNotFound = errors.New("no item found for this ID")
 
 // BadgerLogWapper implements badger.Logger to forward logs to log/slog.
 type BadgerLogWapper struct {
@@ -32,19 +32,19 @@ type BadgerLogWapper struct {
 }
 
 func (logger *BadgerLogWapper) Errorf(f string, args ...interface{}) {
-	logger.Logger.Error(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+	logger.Error(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
 }
 
 func (logger *BadgerLogWapper) Warningf(f string, args ...interface{}) {
-	logger.Logger.Warn(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+	logger.Warn(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
 }
 
 func (logger *BadgerLogWapper) Infof(f string, args ...interface{}) {
-	logger.Logger.Info(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+	logger.Info(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
 }
 
 func (logger *BadgerLogWapper) Debugf(f string, args ...interface{}) {
-	logger.Logger.Debug(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
+	logger.Debug(fmt.Sprintf(f, args...), slog.String("producer", "badger"))
 }
 
 // randomIdGenerator returns an ID generator for the "random" type.
@@ -143,9 +143,9 @@ func NewStore(
 	opts.Dir = s.databaseDir()
 	opts.ValueDir = opts.Dir
 	opts.Logger = &BadgerLogWapper{slog.Default()}
-	opts.Options.BaseLevelSize = 1 << 21    // 2MiB
-	opts.Options.ValueLogFileSize = 1 << 24 // 16MiB
-	opts.Options.BaseTableSize = 1 << 20    // 1MiB
+	opts.BaseLevelSize = 1 << 21    // 2MiB
+	opts.ValueLogFileSize = 1 << 24 // 16MiB
+	opts.BaseTableSize = 1 << 20    // 1MiB
 
 	s.bh, err = badgerhold.Open(opts)
 	if err != nil {
