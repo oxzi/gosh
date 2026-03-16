@@ -1,0 +1,31 @@
+{{- if and .Values.store.persistence.enabled (not .Values.store.persistence.existingClaim) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ template "gosh.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+{{- with .Values.store.persistence.annotations  }}
+  annotations:
+    "helm.sh/resource-policy": keep
+{{ toYaml . | indent 4 }}
+{{- end }}
+  labels:
+    app: {{ template "gosh.fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  accessModes:
+    - {{ .Values.store.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.store.persistence.size | quote }}
+{{- if .Values.store.persistence.storageClass }}
+{{- if (eq "-" .Values.store.persistence.storageClass) }}
+  storageClassName: ""
+{{- else }}
+  storageClassName: "{{ .Values.store.persistence.storageClass }}"
+{{- end }}
+{{- end }}
+{{- end }}
+
