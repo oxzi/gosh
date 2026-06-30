@@ -10,13 +10,13 @@ let
 
     src = ../../.;
 
-    buildInputs = [ pkgs.bash pkgs.curl ];
     nativeBuildInputs = [ pkgs.makeWrapper ];
 
     installPhase = ''
       mkdir -p $out/bin
       cp ./contrib/bash/goshy $out/bin/goshy
       wrapProgram $out/bin/goshy \
+        --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.curl pkgs.file pkgs.gawk pkgs.qrencode ]} \
         --set GOSH_INSTANCE "${cfg.instance}" \
         --set PERIOD "${cfg.expiryPeriod}" \
         ${lib.optionalString cfg.burnAfterReading "--set BURN 1"} \
